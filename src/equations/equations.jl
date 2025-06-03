@@ -666,6 +666,15 @@ In particular, not the components themselves are returned.
     Base.OneTo(ncomponents(equations))
 end
 
+###################################################################################################
+# Intrinsic Beam Equation
+include("intrinsic_beam_equation/auxiliary.jl")
+include("intrinsic_beam_equation/intrinsic_beam_equation.jl")
+include("intrinsic_beam_equation/visualization.jl")
+###################################################################################################
+include("damped_intrinsic_beam_equation/Full_Damped_Hyperbolic_System.jl")
+include("damped_intrinsic_beam_equation/operator_definitions.jl")
+
 # Diffusion equation: first order hyperbolic system
 abstract type AbstractHyperbolicDiffusionEquations{NDIMS, NVARS} <:
               AbstractEquations{NDIMS, NVARS} end

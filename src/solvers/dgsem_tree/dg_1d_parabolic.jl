@@ -99,6 +99,15 @@ function rhs_parabolic!(du, u, t, mesh::TreeMesh{1},
         apply_jacobian_parabolic!(du, mesh, equations_parabolic, dg, cache_parabolic)
     end
 
+    #Calculate source terms
+    @trixi_timeit timer() "source terms" begin
+        calc_sources!(gradients, du, u, t, source_terms, equations_parabolic, dg, cache)
+    end
+
+    @trixi_timeit timer() "multiply gamma_inv" multiply_gamma_inverse!(
+        du, u, t, equations_parabolic, dg, cache)
+
+
     return nothing
 end
 
@@ -578,4 +587,93 @@ function apply_jacobian_parabolic!(du, mesh::TreeMesh{1},
 
     return nothing
 end
+
+#TODO: Taal dimension agnostic
+function calc_sources!(gradients, du, u, t, source_terms::Nothing,
+    equations::AbstractEquationsParabolic, dg::DG, cache)
+return nothing
+end
+
+function custom_source_terms(gradients, u_local, x_local, t, equations::Damped_Full_Parabolic)
+    @unpack dampingMat, flexMat, massMat, Ematrix, flexMatInverse = equations
+
+    L1matrix = generate_L1_matrix(u_local[1:6])
+    L2matrix = generate_L2_matrix(u_local[7:12])
+
+    rhat = dampingMat * flexMatInverse * (gradients[1:6] - Ematrix' * u_local[1:6] + L1matrix' * flexMat * u_local[7:12])
+    L2rmatrix = generate_L2_matrix(rhat)
+
+    Bmatrix = [zeros(6, 6) Ematrix; -Ematrix' zeros(6, 6)]
+    j1matrix = [-L1matrix * massMat zeros(6, 6); zeros(6, 6) zeros(6, 6)]
+    j2matrix = [zeros(6, 6) -L2matrix * flexMat; zeros(6, 6) L1matrix' * flexMat]
+    j3matrix = [zeros(6, 6) -L2rmatrix * flexMat; zeros(6, 6) zeros(6, 6)]
+    j4matrix = [Ematrix * rhat; zeros(6, 1)]
+
+    part_1 = (Bmatrix + j1matrix + j2matrix + j3matrix) * u_local
+    part_2 = j4matrix + [equations.equations_hyperbolic.f_ext(x_local, t); zeros(6, 1)]
+
+    source_term = part_1 + part_2
+
+    return source_term
+end
+
+function calc_sources!(gradients, du, u, t, source_terms::Nothing,
+    equations::Damped_Full_Parabolic, dg::DG, cache)
+    @unpack node_coordinates = cache.elements
+
+    @threaded for element in eachelement(dg, cache)
+        for i in eachnode(dg)
+            u_local = get_node_vars(u, equations, dg, i, element)
+            x_local = get_node_coords(node_coordinates, equations, dg,
+                                      i, element)
+            gradients_local = get_node_vars(gradients, equations, dg, i,
+                                      element)
+            du_local = custom_source_terms(gradients_local, u_local, x_local, t, equations)
+            add_to_node_vars!(du, du_local, equations, dg, i, element)
+        end
+    end
+
+  return nothing
+return nothing
+end
+function calc_sources!(gradients, du, u, t, source_terms,
+    equations::Damped_Full_Parabolic, dg::DG, cache)
+    @unpack node_coordinates = cache.elements
+
+    @threaded for element in eachelement(dg, cache)
+        for i in eachnode(dg)
+            u_local = get_node_vars(u, equations, dg, i, element)
+            x_local = get_node_coords(node_coordinates, equations, dg,
+                                      i, element)
+            gradients_local = get_node_vars(gradients, equations, dg, i,
+                                      element)
+            du_local_given = source_terms(u_local, x_local, t, equations)
+            du_local_calc = custom_source_terms(gradients_local, u_local, x_local, t, equations)
+            du_local = du_local_given + du_local_calc
+            add_to_node_vars!(du, du_local, equations, dg, i, element)
+        end
+    end
+
+  return nothing
+return nothing
+end
+
+function multiply_gamma_inverse!(du, u, t,
+    equations::AbstractEquationsParabolic, dg::DG, cache)  
+      return nothing
+  end
+
+  function multiply_gamma_inverse!(du, u, t,
+    equations::Damped_Full_Parabolic, dg::DG, cache)
+  
+      @threaded for element in eachelement(dg, cache)
+        for i in eachnode(dg)
+          du[:, i, element] = equations.gammainverse * du[:, i, element]
+        end
+       end
+   
+       return nothing
+   end
+
+
 end # @muladd

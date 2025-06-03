@@ -25,9 +25,9 @@ const _PREFERENCE_LOOPVECTORIZATION = @load_preference("loop_vectorization", tru
 # (standard library packages first, other packages next, all of them sorted alphabetically)
 
 using Accessors: @reset
-using LinearAlgebra: LinearAlgebra, Diagonal, diag, dot, eigvals, mul!, norm, cross,
+using LinearAlgebra: LinearAlgebra, Diagonal, diag, diagm, dot, eigvals, mul!, norm, cross,
                      normalize, I,
-                     UniformScaling, det
+                     UniformScaling, det, isdiag, eigvals
 using Printf: @printf, @sprintf, println
 using SparseArrays: AbstractSparseMatrix, AbstractSparseMatrixCSC, sparse, droptol!,
                     rowvals, nzrange, nonzeros
@@ -137,8 +137,21 @@ include("auxiliary/p4est.jl")
 include("auxiliary/t8code.jl")
 include("equations/equations.jl")
 include("meshes/meshes.jl")
+
+# specify transformation of conservative variables prior to taking gradients.
+# specialize this function to compute gradients e.g., of primitive variables instead of conservative
+gradient_variable_transformation(::AbstractEquationsParabolic) = cons2cons
+
+# By default, the gradients are taken with respect to the conservative variables.
+# this is reflected by the type parameter `GradientVariablesConservative` in the abstract
+# type `AbstractEquationsParabolic{NDIMS, NVARS, GradientVariablesConservative}`.
+struct GradientVariablesConservative end
+include("equations/damped_intrinsic_beam_equation/Full_Damped_Parabolic_System.jl")
+
+
 include("solvers/solvers.jl")
 include("equations/equations_parabolic.jl") # these depend on parabolic solver types
+
 include("semidiscretization/semidiscretization.jl")
 include("semidiscretization/semidiscretization_hyperbolic.jl")
 include("semidiscretization/semidiscretization_hyperbolic_parabolic.jl")
@@ -315,6 +328,18 @@ export convergence_test, jacobian_fd, jacobian_ad_forward, linear_structure
 export DGMulti, DGMultiBasis, estimate_dt, DGMultiMesh, GaussSBP
 
 export ViscousFormulationBassiRebay1, ViscousFormulationLocalDG
+
+###############################################################################
+# Intrinsic beam related
+export reshape_solution, generate_posdef_matrix, constitutive_laws, source_term_intrinsic_beam, source_term_intrinsic_beam_diag,
+       initial_condition_constant, plot_deformed_beam, plot_undeformed_beam, integrate_trapez,
+       calc_deformation, calc_deformation_trapez, calc_beam_axis, flux_upwind,
+       boundary_conditions_ib, calc_rot_mat_y, calc_rot_mat_z, man_sol, compute_energy, tilde
+export IntrinsicBeamEquation
+export Damped_Full_Hyperbolic
+export Damped_Full_Parabolic
+export generate_L1_matrix, generate_L2_matrix, generate_E_matrix
+###############################################################################
 
 # Visualization-related exports
 export PlotData1D, PlotData2D, ScalarPlotData2D, getmesh, adapt_to_mesh_level!,

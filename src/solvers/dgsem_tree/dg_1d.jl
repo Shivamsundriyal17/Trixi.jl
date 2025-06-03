@@ -120,7 +120,11 @@ function rhs!(du, u, t,
         calc_sources!(du, u, t, source_terms, equations, dg, cache)
     end
 
-    return nothing
+    # multiply by Gamm_inv
+  @trixi_timeit timer() "multiply gamma_inv" multiply_gamma_inverse!(
+    du, u, t, equations, dg, cache)
+
+  return nothing
 end
 
 function calc_volume_integral!(du, u,
@@ -639,6 +643,14 @@ function calc_sources!(du, u, t, source_terms::Nothing,
     return nothing
 end
 
+function calc_sources!(du, u, t, source_terms::Nothing,
+    equations::Damped_Full_Hyperbolic, dg::DG, cache)
+return nothing
+end
+function calc_sources!(du, u, t, source_terms,
+    equations::Damped_Full_Hyperbolic, dg::DG, cache)
+return nothing
+end
 function calc_sources!(du, u, t, source_terms,
                        equations::AbstractEquations{1}, dg::DG, cache)
     @unpack node_coordinates = cache.elements
@@ -653,6 +665,40 @@ function calc_sources!(du, u, t, source_terms,
         end
     end
 
+  return nothing
+end
+
+
+function multiply_gamma_inverse!(du, u, t,
+  equations::AbstractEquations{1}, dg::DG, cache)
+
     return nothing
 end
+
+
+function multiply_gamma_inverse!(du, u, t,
+  equations::IntrinsicBeamEquation, dg::DG, cache)
+
+    @threaded for element in eachelement(dg, cache)
+      for i in eachnode(dg)
+        du[:, i, element] = equations.Gamma_inv * du[:, i, element]
+      end
+    end
+
+    return nothing
+end
+
+  function multiply_gamma_inverse!(du, u, t,
+    equations::Damped_Full_Hyperbolic, dg::DG, cache)
+  
+      @threaded for element in eachelement(dg, cache)
+        for i in eachnode(dg)
+          du[:, i, element] = equations.Gamma_inv * du[:, i, element]
+        end
+      end
+  
+      return nothing
+  end
+
+
 end # @muladd

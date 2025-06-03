@@ -39,9 +39,12 @@ end
                                                 equations)
     @unpack numerical_flux, dissipation = numflux
 
-    return (numerical_flux(u_ll, u_rr, orientation_or_normal_direction, equations)
-            +
-            dissipation(u_ll, u_rr, orientation_or_normal_direction, equations))
+    # Evaluate the numerical flux and dissipation functions
+    flux_values = numerical_flux(u_ll, u_rr, orientation_or_normal_direction, equations)
+    dissipation_values = dissipation(u_ll, u_rr, orientation_or_normal_direction, equations)
+
+    # Return the sum of flux and dissipation
+    return flux_values + dissipation_values
 end
 
 function Base.show(io::IO, f::FluxPlusDissipation)
