@@ -34,7 +34,8 @@ include("test_trixi.jl")
 
     u1 = SVector{6}(u[1:6])
     u2 = SVector{6}(u[7:12])
-    @test transpose(intrinsic_beam_l1(u1)) * u1 ≈ zeros(6)
+    @test maximum(abs, transpose(intrinsic_beam_l1(u1)) * u1) <=
+          100 * eps(eltype(u1))
     @test intrinsic_beam_l1(u1) * u2 ≈
           transpose(intrinsic_beam_l2(u2)) * u1
 
