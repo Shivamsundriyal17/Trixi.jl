@@ -5,10 +5,10 @@ using Trixi
 # Full nonlinear spin-up from rest; no steady-branch reduction is imposed.
 beam_length = 4.0
 flexibility_matrix = Diagonal(1.0 ./ [1.0e3, 1.0e3, 1.0e3,
-                                     500.0, 500.0, 500.0])
+                                  500.0, 500.0, 500.0])
 mass_matrix = Diagonal([1.0, 1.0, 1.0, 20.0, 10.0, 10.0])
 damping_matrix = Diagonal(1.0 ./ [1.0e3, 1.0e3, 1.0e3,
-                                  10.0, 10.0, 10.0])
+                              10.0, 10.0, 10.0])
 
 terminal_angular_speed = 2.8523
 ramp_duration = 1.0
@@ -24,14 +24,14 @@ function root_velocity(x, t, equations)
 end
 
 equations_hyperbolic = DampedIntrinsicBeamEquations1D(;
-    mass_matrix,
-    flexibility_matrix,
-    damping_matrix,
-    initial_curvature = zeros(3))
+                                                      mass_matrix,
+                                                      flexibility_matrix,
+                                                      damping_matrix,
+                                                      initial_curvature = zeros(3))
 equations_parabolic = DampedIntrinsicBeamDiffusion1D(equations_hyperbolic)
 
 boundary_condition = BoundaryConditionDampedIntrinsicBeam(;
-    left_velocity = root_velocity)
+                                                          left_velocity = root_velocity)
 boundary_conditions = (boundary_condition, boundary_condition)
 
 polydeg = 3

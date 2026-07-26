@@ -4,17 +4,17 @@ using Trixi
 
 beam_length = 1.0
 flexibility_matrix = Diagonal(1.0 ./ [1.0e3, 1.0e3, 1.0e3,
-                                     500.0, 500.0, 500.0])
+                                  500.0, 500.0, 500.0])
 mass_matrix = Diagonal([1.0, 1.0, 1.0, 20.0, 10.0, 10.0])
 damping_matrix = 2.0 *
                  Diagonal(1.0 ./ [1.0e3, 1.0e3, 1.0e3,
-                                  10.0, 10.0, 10.0])
+                              10.0, 10.0, 10.0])
 
 equations_hyperbolic = DampedIntrinsicBeamEquations1D(;
-    mass_matrix,
-    flexibility_matrix,
-    damping_matrix,
-    initial_curvature = zeros(3))
+                                                      mass_matrix,
+                                                      flexibility_matrix,
+                                                      damping_matrix,
+                                                      initial_curvature = zeros(3))
 equations_parabolic = DampedIntrinsicBeamDiffusion1D(equations_hyperbolic)
 
 function initial_condition(x, t, equations::DampedIntrinsicBeamEquations1D)

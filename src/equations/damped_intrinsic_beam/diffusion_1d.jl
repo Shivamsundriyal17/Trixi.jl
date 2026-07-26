@@ -55,7 +55,7 @@ end
     upper_flux = hyperbolic.mass_inverse * damping_resultant
     ScalarT = eltype(upper_flux)
     return SVector{12}(ntuple(index -> index <= 6 ? upper_flux[index] :
-                                      zero(ScalarT), 12))
+                                       zero(ScalarT), 12))
 end
 
 """
@@ -145,6 +145,6 @@ end
         upper_flux = hyperbolic.mass_inverse * damping_resultant
         ScalarT = eltype(upper_flux)
         return SVector{12}(ntuple(index -> index <= 6 ? upper_flux[index] :
-                                          zero(ScalarT), 12))
+                                           zero(ScalarT), 12))
     end
 end

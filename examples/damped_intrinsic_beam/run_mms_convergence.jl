@@ -91,6 +91,7 @@ open(output_file, "w") do io
     for polydeg in polydegs, sigma in penalties,
         auxiliary_flux in auxiliary_fluxes,
         refinement_level in refinement_levels
+
         ncells = 2^refinement_level
         h = 1 / ncells
         flux_name = hyperbolic_flux_name(sigma)

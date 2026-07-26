@@ -65,27 +65,27 @@ function physical_external_force(x, t, equations)
 end
 
 equations_hyperbolic = DampedIntrinsicBeamEquations1D(;
-    mass_matrix,
-    flexibility_matrix,
-    damping_matrix,
-    initial_curvature = zeros(3),
-    external_force = physical_external_force)
+                                                      mass_matrix,
+                                                      flexibility_matrix,
+                                                      damping_matrix,
+                                                      initial_curvature = zeros(3),
+                                                      external_force = physical_external_force)
 equations_parabolic = DampedIntrinsicBeamDiffusion1D(equations_hyperbolic)
 
 function verify_manufactured_solution()
     for x in range(0.0, beam_length; length = 5), t in (0.0, 0.25, 1.0)
         source = manufactured_source_damped_intrinsic_beam(x, t,
-                                                          equations_parabolic,
-                                                          manufactured_solution,
-                                                          manufactured_solution_t,
-                                                          manufactured_solution_x,
-                                                          manufactured_solution_xx)
+                                                           equations_parabolic,
+                                                           manufactured_solution,
+                                                           manufactured_solution_t,
+                                                           manufactured_solution_x,
+                                                           manufactured_solution_xx)
         @assert maximum(abs, source[7:12]) < 2.0e-12
 
         u = manufactured_solution(x, t)
         u_x = manufactured_solution_x(x, t)
         damping_resultant = intrinsic_beam_damping_resultant(u, u_x,
-                                                            equations_parabolic)
+                                                             equations_parabolic)
         constitutive_resultant = damping_matrix *
                                  manufactured_solution_t(x, t)[7:12]
         @assert isapprox(damping_resultant, constitutive_resultant;
@@ -113,7 +113,7 @@ sigma = 1.0
 @inline function flux_mms(u_ll, u_rr, orientation,
                           equations::DampedIntrinsicBeamEquations1D)
     central_flux = 0.5 * (flux(u_ll, orientation, equations) +
-                          flux(u_rr, orientation, equations))
+                    flux(u_rr, orientation, equations))
     dissipation = 0.5 * sigma * equations.propagation_matrix_abs *
                   (u_ll - u_rr)
     return central_flux + dissipation

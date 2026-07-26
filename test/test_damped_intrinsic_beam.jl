@@ -11,10 +11,10 @@ include("test_trixi.jl")
     mass = Matrix(Diagonal(2.0:7.0))
     damping = 0.1 * flexibility
     equations = DampedIntrinsicBeamEquations1D(;
-        mass_matrix = mass,
-        flexibility_matrix = flexibility,
-        damping_matrix = damping,
-        initial_curvature = zeros(3))
+                                               mass_matrix = mass,
+                                               flexibility_matrix = flexibility,
+                                               damping_matrix = damping,
+                                               initial_curvature = zeros(3))
     equations_parabolic = DampedIntrinsicBeamDiffusion1D(equations)
 
     @test equations.propagation_matrix_plus +
@@ -28,7 +28,7 @@ include("test_trixi.jl")
     @test flux_upwind(u, u, 1, equations) ≈ flux(u, 1, equations)
     @test entropy(u, equations) isa Number
     damping_resultant = intrinsic_beam_damping_resultant(u, gradient,
-                                                        equations_parabolic)
+                                                         equations_parabolic)
     @test flux(u, gradient, 1, equations_parabolic)[1:6] ≈
           equations.mass_inverse * damping_resultant
 
@@ -44,10 +44,10 @@ include("test_trixi.jl")
     l2 = intrinsic_beam_l2(u2)
     l2_damping = intrinsic_beam_l2(damping_resultant)
     source_matrix = [zero66 geometry; -transpose(geometry) zero66] +
-                    [-l1 * equations.mass_matrix zero66; zero66 zero66] +
-                    [zero66 -l2 * equations.flexibility_matrix;
-                     zero66 transpose(l1) * equations.flexibility_matrix] +
-                    [zero66 -l2_damping * equations.flexibility_matrix;
+                    [-l1*equations.mass_matrix zero66; zero66 zero66] +
+                    [zero66 -l2*equations.flexibility_matrix;
+                     zero66 transpose(l1)*equations.flexibility_matrix] +
+                    [zero66 -l2_damping*equations.flexibility_matrix;
                      zero66 zero66]
     source_reference = source_matrix * u +
                        [geometry * damping_resultant; zeros(6)]
@@ -59,30 +59,32 @@ include("test_trixi.jl")
     nonsymmetric_mass = copy(mass)
     nonsymmetric_mass[1, 2] = 1.0
     @test_throws ArgumentError DampedIntrinsicBeamEquations1D(;
-        mass_matrix = nonsymmetric_mass,
-        flexibility_matrix = flexibility,
-        damping_matrix = damping)
+                                                              mass_matrix = nonsymmetric_mass,
+                                                              flexibility_matrix = flexibility,
+                                                              damping_matrix = damping)
 
     incompatible_damping = copy(damping)
     incompatible_damping[1, 1] = 0.2
     incompatible_damping[1, 2] = incompatible_damping[2, 1] = 0.05
     @test_throws ArgumentError DampedIntrinsicBeamEquations1D(;
-        mass_matrix = mass,
-        flexibility_matrix = flexibility,
-        damping_matrix = incompatible_damping)
+                                                              mass_matrix = mass,
+                                                              flexibility_matrix = flexibility,
+                                                              damping_matrix = incompatible_damping)
 
     zero_field = (x, t) -> zero(SVector{12, Float64})
-    inconsistent_time_derivative = (x, t) ->
-        SVector{12}(zeros(6)..., ones(6)...)
-    @test_throws ArgumentError manufactured_force_damped_intrinsic_beam(
-        0.0, 0.0, equations_parabolic,
-        zero_field, inconsistent_time_derivative, zero_field, zero_field)
+    inconsistent_time_derivative = (x, t) -> SVector{12}(zeros(6)..., ones(6)...)
+    @test_throws ArgumentError manufactured_force_damped_intrinsic_beam(0.0, 0.0,
+                                                                        equations_parabolic,
+                                                                        zero_field,
+                                                                        inconsistent_time_derivative,
+                                                                        zero_field,
+                                                                        zero_field)
 end
 
 @trixi_testset "TreeMesh1D: elixir_mms_physical.jl" begin
     @test_trixi_include(joinpath(examples_dir(), "damped_intrinsic_beam",
                                  "elixir_mms_physical.jl"),
-                        l2 = [
+                        l2=[
                             4.234853472065755e-7,
                             1.0893933103973503e-6,
                             1.2460689375612526e-6,
@@ -96,7 +98,7 @@ end
                             1.3554102630853058e-7,
                             1.1784307340513368e-7
                         ],
-                        linf = [
+                        linf=[
                             2.6087661337825807e-6,
                             6.611107070453315e-6,
                             7.402831811553767e-6,
@@ -115,15 +117,15 @@ end
 @trixi_testset "TreeMesh1D: elixir_rotating_beam.jl" begin
     @test_trixi_include(joinpath(examples_dir(), "damped_intrinsic_beam",
                                  "elixir_rotating_beam.jl"),
-                        tspan = (0.0, 1.0e-4),
-                        save_times = [0.0, 1.0e-4])
+                        tspan=(0.0, 1.0e-4),
+                        save_times=[0.0, 1.0e-4])
 end
 
 @trixi_testset "TreeMesh1D: elixir_nonsmooth_resultant.jl" begin
     @test_trixi_include(joinpath(examples_dir(), "damped_intrinsic_beam",
                                  "elixir_nonsmooth_resultant.jl"),
-                        tspan = (0.0, 1.0e-4),
-                        save_times = [0.0, 1.0e-4])
+                        tspan=(0.0, 1.0e-4),
+                        save_times=[0.0, 1.0e-4])
 end
 
 end # module

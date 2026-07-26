@@ -17,8 +17,8 @@ function _intrinsic_beam_matrix(matrix::AbstractMatrix{<:Real}, name;
         throw(ArgumentError("$name must be symmetric"))
 
     symmetric_matrix = LinearAlgebra.Symmetric(0.5 *
-                                              (dense_matrix +
-                                               transpose(dense_matrix)))
+                                               (dense_matrix +
+                                                transpose(dense_matrix)))
     eigenvalues = LinearAlgebra.eigvals(symmetric_matrix)
     if positive_definite
         minimum(eigenvalues) > tolerance ||
@@ -119,10 +119,10 @@ function DampedIntrinsicBeamEquations1D(;
              atol = tolerance, rtol = 500 * eps(RealT)) ||
         throw(ArgumentError("damping_matrix * inv(flexibility_matrix) must be symmetric"))
     damping_operator = SMatrix{6, 6, RealT}(0.5 *
-                                           (damping_operator_raw +
-                                            transpose(damping_operator_raw)))
+                                            (damping_operator_raw +
+                                             transpose(damping_operator_raw)))
     minimum(LinearAlgebra.eigvals(LinearAlgebra.Symmetric(Matrix(damping_operator)))) >=
-        -tolerance ||
+    -tolerance ||
         throw(ArgumentError("the compatible damping operator must be positive semidefinite"))
 
     zero66 = zero(SMatrix{6, 6, RealT, 36})
@@ -160,23 +160,23 @@ function DampedIntrinsicBeamEquations1D(;
 
     geometry_matrix = intrinsic_beam_e(curvature)
     return DampedIntrinsicBeamEquations1D{RealT, typeof(external_force)}(mass,
-                                                                        flexibility,
-                                                                        damping,
-                                                                        curvature,
-                                                                        external_force,
-                                                                        geometry_matrix,
-                                                                        mass_inverse,
-                                                                        flexibility_inverse,
-                                                                        damping_operator,
-                                                                        capacity,
-                                                                        capacity_inverse,
-                                                                        propagation,
-                                                                        propagation_abs,
-                                                                        propagation_plus,
-                                                                        propagation_minus,
-                                                                        left_impedance,
-                                                                        right_impedance,
-                                                                        maximum_wave_speed)
+                                                                         flexibility,
+                                                                         damping,
+                                                                         curvature,
+                                                                         external_force,
+                                                                         geometry_matrix,
+                                                                         mass_inverse,
+                                                                         flexibility_inverse,
+                                                                         damping_operator,
+                                                                         capacity,
+                                                                         capacity_inverse,
+                                                                         propagation,
+                                                                         propagation_abs,
+                                                                         propagation_plus,
+                                                                         propagation_minus,
+                                                                         left_impedance,
+                                                                         right_impedance,
+                                                                         maximum_wave_speed)
 end
 
 function varnames(::typeof(cons2cons), ::DampedIntrinsicBeamEquations1D)
@@ -184,8 +184,9 @@ function varnames(::typeof(cons2cons), ::DampedIntrinsicBeamEquations1D)
             "f1", "f2", "f3", "m1", "m2", "m3")
 end
 
-varnames(::typeof(cons2prim), equations::DampedIntrinsicBeamEquations1D) =
+function varnames(::typeof(cons2prim), equations::DampedIntrinsicBeamEquations1D)
     varnames(cons2cons, equations)
+end
 
 @inline cons2prim(u, ::DampedIntrinsicBeamEquations1D) = u
 
