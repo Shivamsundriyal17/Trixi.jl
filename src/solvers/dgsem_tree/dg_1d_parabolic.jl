@@ -99,6 +99,13 @@ function rhs_parabolic!(du, u, t, mesh::TreeMesh{1},
         apply_jacobian_parabolic!(du, mesh, equations_parabolic, dg, cache_parabolic)
     end
 
+    # Some mixed formulations contain local terms that depend on the auxiliary
+    # gradient computed above. The default implementation is a no-op.
+    @trixi_timeit timer() "gradient-dependent source terms" begin
+        add_gradient_dependent_source_terms!(du, gradients, u, t, mesh,
+                                             equations_parabolic, dg, cache)
+    end
+
     return nothing
 end
 
@@ -576,6 +583,25 @@ function apply_jacobian_parabolic!(du, mesh::TreeMesh{1},
         end
     end
 
+    return nothing
+end
+
+"""
+    add_gradient_dependent_source_terms!(du, gradients, u, t, mesh,
+                                         equations_parabolic, dg, cache)
+
+Add local source terms that depend on the physical gradient computed by the
+one-dimensional parabolic operator. The default implementation does nothing.
+
+This hook is separate from the `source_terms` callback of
+[`SemidiscretizationHyperbolicParabolic`](@ref). The latter belongs to the
+standard hyperbolic right-hand side and must not be evaluated a second time in
+the parabolic split.
+"""
+function add_gradient_dependent_source_terms!(du, gradients, u, t,
+                                              mesh::TreeMesh{1},
+                                              equations_parabolic::AbstractEquationsParabolic,
+                                              dg::DG, cache)
     return nothing
 end
 end # @muladd
