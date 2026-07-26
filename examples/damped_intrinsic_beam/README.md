@@ -35,6 +35,9 @@ julia --project=examples/damped_intrinsic_beam \
   examples/damped_intrinsic_beam/results/mms_convergence.csv
 ```
 
+The committed full-run data and finest-grid EOC summary are in
+[`reference/`](reference/).
+
 The defaults are polynomial degrees `1,2,3`, cell counts
 `4,8,16,32,64,128`, characteristic upwinding (`sigma=1`), both alternating
 LDG and BR1 auxiliary traces, final time `T=1`, and absolute/relative ROCK4
