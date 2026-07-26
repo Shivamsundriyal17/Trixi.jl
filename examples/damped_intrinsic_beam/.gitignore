@@ -1,0 +1,6 @@
+/results/*.csv
+/results/*.pdf
+/results/*.png
+/results/*.mp4
+!/Manifest.toml
+!/LocalPreferences.toml
