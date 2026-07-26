@@ -2,5 +2,6 @@
 /results/*.pdf
 /results/*.png
 /results/*.mp4
+/results/*.jls
 !/Manifest.toml
 !/LocalPreferences.toml

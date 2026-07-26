@@ -71,6 +71,38 @@ uniform cells, and CFL `0.01`. The rotating case runs to `T=40`; the localized
 resultant-jump case runs to `T=10`. They save solution states and scalar
 diagnostics but do not load a plotting package or write figures.
 
+## Optional visualization
+
+Exporters run the simulation environment and save plain Julia arrays:
+
+```bash
+julia --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/save_rotating_beam_data.jl
+
+julia --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/save_nonsmooth_resultant_data.jl
+```
+
+Plotting has a separate environment:
+
+```bash
+julia --project=examples/damped_intrinsic_beam/visualization -e \
+  'using Pkg; Pkg.instantiate()'
+
+julia --project=examples/damped_intrinsic_beam/visualization \
+  examples/damped_intrinsic_beam/visualization/plot_rotating_beam.jl
+
+julia --project=examples/damped_intrinsic_beam/visualization \
+  examples/damped_intrinsic_beam/visualization/plot_nonsmooth_resultant.jl
+
+julia --project=examples/damped_intrinsic_beam/visualization \
+  examples/damped_intrinsic_beam/visualization/plot_mms_convergence.jl
+```
+
+Each exporter and plotter accepts an explicit input/output path through command
+line arguments. Generated data and figures go to `results/` by default and are
+ignored by Git.
+
 The ordinary Trixi `source_terms` callback belongs to the hyperbolic split and
 is not reused by the Kelvin--Voigt operator. Physical distributed forces and
 moments are passed as `external_force` when constructing
