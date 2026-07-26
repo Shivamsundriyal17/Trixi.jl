@@ -189,6 +189,8 @@ export GradientVariablesConservative, GradientVariablesPrimitive, GradientVariab
 
 export intrinsic_beam_skew, intrinsic_beam_l1, intrinsic_beam_l2, intrinsic_beam_e
 export intrinsic_beam_damping_resultant, intrinsic_beam_gradient_source,
+       manufactured_source_damped_intrinsic_beam,
+       manufactured_force_damped_intrinsic_beam,
        flux_upwind, BoundaryConditionDampedIntrinsicBeam
 
 export flux, flux_central, flux_lax_friedrichs, flux_hll, flux_hllc, flux_hlle,

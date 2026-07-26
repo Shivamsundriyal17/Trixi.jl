@@ -9,6 +9,7 @@ struct GradientVariablesConservative end
 
 # Kelvin--Voigt damping for the intrinsic beam equations
 include("damped_intrinsic_beam/diffusion_1d.jl")
+include("damped_intrinsic_beam/manufactured_1d.jl")
 
 # Linear scalar diffusion for use in linear scalar advection-diffusion problems
 abstract type AbstractLaplaceDiffusion{NDIMS, NVARS} <:
