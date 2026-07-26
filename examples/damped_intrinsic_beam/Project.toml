@@ -1,6 +1,7 @@
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+OrdinaryDiffEqLowStorageRK = "b0944070-b475-4768-8dec-fb6eb410534d"
 OrdinaryDiffEqStabilizedRK = "358294b1-0aab-51c3-aafe-ad5ab194a2ad"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Trixi = "a7f1ee26-1774-49b1-8366-f1abc58fbfcb"
@@ -9,5 +10,6 @@ Trixi = "a7f1ee26-1774-49b1-8366-f1abc58fbfcb"
 Trixi = {path = "../.."}
 
 [compat]
+OrdinaryDiffEqLowStorageRK = "=1.7.0"
 OrdinaryDiffEqStabilizedRK = "=1.4.0"
 julia = "1.10"

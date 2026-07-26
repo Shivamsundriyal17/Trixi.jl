@@ -55,6 +55,22 @@ Available variables are `MMS_POLYDEGS`, `MMS_REFINEMENT_LEVELS`,
 `MMS_SIGMAS`, `MMS_AUXILIARY_FLUXES`, and `MMS_TIME_TOL`. Refinement level
 `r` means `2^r` uniform cells.
 
+The two canonical nonsmooth/nonhomogeneous experiments are:
+
+```bash
+julia --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/elixir_rotating_beam.jl
+
+julia --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/elixir_nonsmooth_resultant.jl
+```
+
+Both use characteristic upwinding, the alternating LDG traces
+`hat(u1)=u1^-` and `hat(r_tau)=r_tau^+`, polynomial degree three, eight
+uniform cells, and CFL `0.01`. The rotating case runs to `T=40`; the localized
+resultant-jump case runs to `T=10`. They save solution states and scalar
+diagnostics but do not load a plotting package or write figures.
+
 The ordinary Trixi `source_terms` callback belongs to the hyperbolic split and
 is not reused by the Kelvin--Voigt operator. Physical distributed forces and
 moments are passed as `external_force` when constructing

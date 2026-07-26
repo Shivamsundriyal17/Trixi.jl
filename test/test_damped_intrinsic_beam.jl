@@ -112,4 +112,18 @@ end
                         ])
 end
 
+@trixi_testset "TreeMesh1D: elixir_rotating_beam.jl" begin
+    @test_trixi_include(joinpath(examples_dir(), "damped_intrinsic_beam",
+                                 "elixir_rotating_beam.jl"),
+                        tspan = (0.0, 1.0e-4),
+                        save_times = [0.0, 1.0e-4])
+end
+
+@trixi_testset "TreeMesh1D: elixir_nonsmooth_resultant.jl" begin
+    @test_trixi_include(joinpath(examples_dir(), "damped_intrinsic_beam",
+                                 "elixir_nonsmooth_resultant.jl"),
+                        tspan = (0.0, 1.0e-4),
+                        save_times = [0.0, 1.0e-4])
+end
+
 end # module
