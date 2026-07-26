@@ -186,6 +186,8 @@ export LaplaceDiffusion1D, LaplaceDiffusion2D, LaplaceDiffusion3D,
 
 export GradientVariablesConservative, GradientVariablesPrimitive, GradientVariablesEntropy
 
+export intrinsic_beam_skew, intrinsic_beam_l1, intrinsic_beam_l2, intrinsic_beam_e
+
 export flux, flux_central, flux_lax_friedrichs, flux_hll, flux_hllc, flux_hlle,
        flux_godunov,
        flux_chandrashekar, flux_ranocha, flux_derigs_etal, flux_hindenlang_gassner,
