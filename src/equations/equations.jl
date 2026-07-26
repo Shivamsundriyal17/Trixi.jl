@@ -693,6 +693,7 @@ include("linearized_euler_3d.jl")
 
 # Intrinsic beam equations
 include("damped_intrinsic_beam/algebra.jl")
+include("damped_intrinsic_beam/equations_1d.jl")
 
 abstract type AbstractEquationsParabolic{NDIMS, NVARS, GradientVariables} <:
               AbstractEquations{NDIMS, NVARS} end

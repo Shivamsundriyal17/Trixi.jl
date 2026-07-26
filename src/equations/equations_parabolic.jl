@@ -7,6 +7,9 @@ gradient_variable_transformation(::AbstractEquationsParabolic) = cons2cons
 # type `AbstractEquationsParabolic{NDIMS, NVARS, GradientVariablesConservative}`.
 struct GradientVariablesConservative end
 
+# Kelvin--Voigt damping for the intrinsic beam equations
+include("damped_intrinsic_beam/diffusion_1d.jl")
+
 # Linear scalar diffusion for use in linear scalar advection-diffusion problems
 abstract type AbstractLaplaceDiffusion{NDIMS, NVARS} <:
               AbstractEquationsParabolic{NDIMS, NVARS, GradientVariablesConservative} end

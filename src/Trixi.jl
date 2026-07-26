@@ -182,11 +182,14 @@ export LaplaceDiffusion1D, LaplaceDiffusion2D, LaplaceDiffusion3D,
        LaplaceDiffusionEntropyVariables1D, LaplaceDiffusionEntropyVariables2D,
        LaplaceDiffusionEntropyVariables3D,
        CompressibleNavierStokesDiffusion1D, CompressibleNavierStokesDiffusion2D,
-       CompressibleNavierStokesDiffusion3D
+       CompressibleNavierStokesDiffusion3D,
+       DampedIntrinsicBeamEquations1D, DampedIntrinsicBeamDiffusion1D
 
 export GradientVariablesConservative, GradientVariablesPrimitive, GradientVariablesEntropy
 
 export intrinsic_beam_skew, intrinsic_beam_l1, intrinsic_beam_l2, intrinsic_beam_e
+export intrinsic_beam_damping_resultant, intrinsic_beam_gradient_source,
+       flux_upwind, BoundaryConditionDampedIntrinsicBeam
 
 export flux, flux_central, flux_lax_friedrichs, flux_hll, flux_hllc, flux_hlle,
        flux_godunov,
