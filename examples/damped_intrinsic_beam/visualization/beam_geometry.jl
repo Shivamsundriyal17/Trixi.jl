@@ -21,7 +21,13 @@ function reconstruct_centerline(node_coordinates, state, flexibility_matrix,
     e1 = [1.0, 0.0, 0.0]
     for index in 2:length(x)
         step = x[index] - x[index - 1]
-        step == 0 && continue
+        if step == 0
+            # DG elements contain both traces of every interior interface.
+            # Preserve the accumulated position when moving from the right
+            # trace of one element to the left trace of its neighbor.
+            centerline[:, index] = centerline[:, index - 1]
+            continue
+        end
         average_strain = 0.5 *
                          (strain[:, index - 1] + strain[:, index])
         average_curvature = initial_curvature +

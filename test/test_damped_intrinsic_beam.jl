@@ -5,6 +5,8 @@ using Test
 using Trixi
 
 include("test_trixi.jl")
+include(joinpath(examples_dir(), "damped_intrinsic_beam", "visualization",
+                 "beam_geometry.jl"))
 
 @testset "Damped intrinsic beam" begin
     flexibility = Matrix(Diagonal(1.0:6.0))
@@ -38,6 +40,13 @@ include("test_trixi.jl")
           100 * eps(eltype(u1))
     @test intrinsic_beam_l1(u1) * u2 ≈
           transpose(intrinsic_beam_l2(u2)) * u1
+
+    interface_coordinates = [0.0, 0.5, 0.5, 1.0]
+    zero_state = zeros(12, length(interface_coordinates))
+    _, centerline = reconstruct_centerline(interface_coordinates, zero_state,
+                                           Matrix{Float64}(I, 6, 6), zeros(3))
+    @test centerline[:, 2] == centerline[:, 3]
+    @test centerline[:, end] ≈ [1.0, 0.0, 0.0]
 
     zero66 = zeros(6, 6)
     geometry = equations.geometry_matrix
