@@ -89,7 +89,8 @@ serialized arrays and a `summary.csv` to
 interface, boundary, physical-root, and SAT-data contributions at every
 accepted time step. The saved-state analysis separately checks the
 instantaneous semi-discrete ledger and errors against the analytic rotating
-branch.
+branch. The CSV retains every cumulative ledger channel, its absolute closure
+residual, and a scale-normalized closure residual.
 
 The reference campaign uses one Julia thread. Since this test has only eight
 elements, additional threads add scheduling overhead without changing the

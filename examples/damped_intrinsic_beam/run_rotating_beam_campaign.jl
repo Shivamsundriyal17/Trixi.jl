@@ -92,12 +92,33 @@ open(summary_file, "w") do io
             "v2_relative_linf,late_f1_relative_linf," *
             "late_v2_relative_linf,beam_length_relative_error," *
             "maximum_ledger_relative_residual," *
-            "cumulative_ledger_residual")
+            "cumulative_material_dissipation," *
+            "cumulative_jump_dissipation," *
+            "cumulative_left_boundary_dissipation," *
+            "cumulative_right_boundary_dissipation," *
+            "cumulative_physical_root_work," *
+            "cumulative_sat_data_work," *
+            "cumulative_ledger_residual," *
+            "cumulative_ledger_relative_residual")
     for data in results
         diagnostics = data.diagnostics
         metrics = diagnostics.final_metrics
+        cumulative_terms = (diagnostics.cumulative_material_dissipation,
+                            diagnostics.cumulative_jump_dissipation,
+                            diagnostics.cumulative_left_boundary_dissipation,
+                            diagnostics.cumulative_right_boundary_dissipation,
+                            diagnostics.cumulative_physical_root_work,
+                            diagnostics.cumulative_sat_data_work)
+        cumulative_scale = max(abs(diagnostics.energy_final -
+                                   first(data.energy_history)),
+                               sum(abs, cumulative_terms), 1.0)
+        cumulative_relative_residual = abs(diagnostics.cumulative_ledger_residual) /
+                                       cumulative_scale
         @printf(io,
-                "%s,%.1f,%s,%.1f,%d,%d,%.4f,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e\n",
+                "%s,%.1f,%s,%.1f,%d,%d,%.4f,"*
+                "%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,"*
+                "%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,"*
+                "%.16e,%.16e,%.16e,%.16e,%.16e\n",
                 data.case_name, data.damping_multiplier,
                 data.steady_initial_condition, last(data.times),
                 data.polydeg, data.ncells, data.cfl,
@@ -109,7 +130,9 @@ open(summary_file, "w") do io
                 diagnostics.late_v2_relative_linf,
                 diagnostics.beam_length_relative_error,
                 diagnostics.maximum_ledger_relative_residual,
-                diagnostics.cumulative_ledger_residual)
+                cumulative_terms...,
+                diagnostics.cumulative_ledger_residual,
+                cumulative_relative_residual)
     end
 end
 
