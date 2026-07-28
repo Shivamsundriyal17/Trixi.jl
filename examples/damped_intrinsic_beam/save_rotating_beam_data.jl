@@ -94,6 +94,7 @@ late_v2_relative_linf = maximum(field_history[index].v2_relative_linf
                                 for index in late_indices)
 maximum_ledger_relative_residual = maximum(item.relative_residual
                                            for item in ledger_history)
+ledger_integral(index) = record_online_ledger ? ledger_integrals[index] : NaN
 
 final_state = reshape(sol.u[end], 12, length(quadrature_weights),
                       length(volume_jacobians))
@@ -124,12 +125,12 @@ diagnostics = (final_metrics,
                late_f1_relative_linf,
                late_v2_relative_linf,
                maximum_ledger_relative_residual,
-               cumulative_material_dissipation = ledger_integrals[1],
-               cumulative_jump_dissipation = ledger_integrals[2],
-               cumulative_left_boundary_dissipation = ledger_integrals[3],
-               cumulative_right_boundary_dissipation = ledger_integrals[4],
-               cumulative_physical_root_work = ledger_integrals[5],
-               cumulative_sat_data_work = ledger_integrals[6],
+               cumulative_material_dissipation = ledger_integral(1),
+               cumulative_jump_dissipation = ledger_integral(2),
+               cumulative_left_boundary_dissipation = ledger_integral(3),
+               cumulative_right_boundary_dissipation = ledger_integral(4),
+               cumulative_physical_root_work = ledger_integral(5),
+               cumulative_sat_data_work = ledger_integral(6),
                cumulative_ledger_residual = ledger_cumulative_residual)
 
 node_coordinates_flat = vec(copy(semi.cache.elements.node_coordinates))

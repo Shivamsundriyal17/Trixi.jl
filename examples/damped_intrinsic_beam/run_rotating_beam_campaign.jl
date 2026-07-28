@@ -1,10 +1,14 @@
 using Dates: UTC, now
-using Printf: @printf
+using Printf: Format, @printf, format
 using Serialization: deserialize
 
 const EXAMPLE_DIRECTORY = @__DIR__
 const EXPORTER = joinpath(EXAMPLE_DIRECTORY, "save_rotating_beam_data.jl")
 const REPOSITORY_ROOT = normpath(joinpath(EXAMPLE_DIRECTORY, "..", ".."))
+const SUMMARY_ROW_FORMAT = Format("%s,%.1f,%s,%.1f,%d,%d,%.4f," *
+                                  "%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e," *
+                                  "%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e," *
+                                  "%.16e,%.16e,%.16e,%.16e,%.16e\n")
 
 output_directory = isempty(ARGS) ?
                    joinpath(EXAMPLE_DIRECTORY, "results",
@@ -103,36 +107,38 @@ open(summary_file, "w") do io
     for data in results
         diagnostics = data.diagnostics
         metrics = diagnostics.final_metrics
-        cumulative_terms = (diagnostics.cumulative_material_dissipation,
+        cumulative_recorded = isfinite(diagnostics.cumulative_ledger_residual)
+        cumulative_terms = cumulative_recorded ?
+                           (diagnostics.cumulative_material_dissipation,
                             diagnostics.cumulative_jump_dissipation,
                             diagnostics.cumulative_left_boundary_dissipation,
                             diagnostics.cumulative_right_boundary_dissipation,
                             diagnostics.cumulative_physical_root_work,
-                            diagnostics.cumulative_sat_data_work)
-        cumulative_scale = max(abs(diagnostics.energy_final -
-                                   first(data.energy_history)),
-                               sum(abs, cumulative_terms), 1.0)
-        cumulative_relative_residual = abs(diagnostics.cumulative_ledger_residual) /
-                                       cumulative_scale
-        @printf(io,
-                "%s,%.1f,%s,%.1f,%d,%d,%.4f,"*
-                "%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,"*
-                "%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e,"*
-                "%.16e,%.16e,%.16e,%.16e,%.16e\n",
-                data.case_name, data.damping_multiplier,
-                data.steady_initial_condition, last(data.times),
-                data.polydeg, data.ncells, data.cfl,
-                diagnostics.energy_final, diagnostics.energy_steady,
-                diagnostics.energy_relative_error,
-                metrics.f1_relative_l2, metrics.f1_relative_linf,
-                metrics.v2_relative_l2, metrics.v2_relative_linf,
-                diagnostics.late_f1_relative_linf,
-                diagnostics.late_v2_relative_linf,
-                diagnostics.beam_length_relative_error,
-                diagnostics.maximum_ledger_relative_residual,
-                cumulative_terms...,
-                diagnostics.cumulative_ledger_residual,
-                cumulative_relative_residual)
+                            diagnostics.cumulative_sat_data_work) :
+                           ntuple(_ -> NaN, 6)
+        cumulative_relative_residual = if cumulative_recorded
+            cumulative_scale = max(abs(diagnostics.energy_final -
+                                       first(data.energy_history)),
+                                   sum(abs, cumulative_terms), 1.0)
+            abs(diagnostics.cumulative_ledger_residual) / cumulative_scale
+        else
+            NaN
+        end
+        format(io, SUMMARY_ROW_FORMAT,
+               data.case_name, data.damping_multiplier,
+               data.steady_initial_condition, last(data.times),
+               data.polydeg, data.ncells, data.cfl,
+               diagnostics.energy_final, diagnostics.energy_steady,
+               diagnostics.energy_relative_error,
+               metrics.f1_relative_l2, metrics.f1_relative_linf,
+               metrics.v2_relative_l2, metrics.v2_relative_linf,
+               diagnostics.late_f1_relative_linf,
+               diagnostics.late_v2_relative_linf,
+               diagnostics.beam_length_relative_error,
+               diagnostics.maximum_ledger_relative_residual,
+               cumulative_terms...,
+               diagnostics.cumulative_ledger_residual,
+               cumulative_relative_residual)
     end
 end
 
