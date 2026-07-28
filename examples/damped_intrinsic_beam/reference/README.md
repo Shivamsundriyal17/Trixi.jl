@@ -27,3 +27,19 @@ julia --project=examples/damped_intrinsic_beam \
   examples/damped_intrinsic_beam/run_mms_convergence.jl \
   examples/damped_intrinsic_beam/reference/mms_convergence.csv
 ```
+
+`rotating_beam_validation.csv` is the quantitative rotating-beam campaign
+used by the paper. Its metadata identifies the exact clean commit and Julia
+thread count. `NaN` in a cumulative column means that online accumulation was
+deliberately disabled for that comparison; instantaneous ledger defects were
+still evaluated at every saved state.
+
+Regenerate the rotating reference with:
+
+```bash
+JULIA_NUM_THREADS=1 julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/run_rotating_beam_campaign.jl \
+  examples/damped_intrinsic_beam/results/rotating_beam_campaign \
+  examples/damped_intrinsic_beam/reference/rotating_beam_validation.csv
+```
