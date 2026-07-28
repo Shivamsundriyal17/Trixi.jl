@@ -74,6 +74,30 @@ uniform cells, and CFL `0.01`. The rotating case runs to `T=40`; the localized
 resultant-jump case runs to `T=10`. They save solution states and scalar
 diagnostics but do not load a plotting package or write figures.
 
+Run the complete rotating-beam validation campaign with:
+
+```bash
+JULIA_NUM_THREADS=8 julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/run_rotating_beam_campaign.jl
+```
+
+The campaign runs the baseline and doubled-damping spin-ups, the singular
+undamped comparison, and a steady-profile initialization check. It writes
+serialized arrays and a `summary.csv` to
+`results/rotating_beam_campaign/`. The baseline run accumulates material,
+interface, boundary, physical-root, and SAT-data contributions at every
+accepted time step. The saved-state analysis separately checks the
+instantaneous semi-discrete ledger and errors against the analytic rotating
+branch.
+
+Use `ROTATING_CAMPAIGN_QUICK=true` for a four-case end-to-end smoke test.
+Set `ROTATING_REUSE_RESULTS=true` to regenerate only the summary from existing
+serialized results. Individual cases can be configured through
+`ROTATING_DAMPING_MULTIPLIER`, `ROTATING_STEADY_INITIAL`,
+`ROTATING_T_END`, `ROTATING_SAVE_COUNT`, and
+`ROTATING_RECORD_LEDGER`.
+
 ## Optional visualization
 
 Exporters run the simulation environment and save plain Julia arrays:
@@ -94,6 +118,10 @@ julia --project=examples/damped_intrinsic_beam/visualization -e \
 
 julia --project=examples/damped_intrinsic_beam/visualization \
   examples/damped_intrinsic_beam/visualization/plot_rotating_beam.jl
+
+julia --project=examples/damped_intrinsic_beam/visualization \
+  examples/damped_intrinsic_beam/visualization/plot_rotating_beam_validation.jl \
+  examples/damped_intrinsic_beam/results/rotating_beam_campaign
 
 julia --project=examples/damped_intrinsic_beam/visualization \
   examples/damped_intrinsic_beam/visualization/plot_nonsmooth_resultant.jl
