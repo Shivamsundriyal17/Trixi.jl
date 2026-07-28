@@ -11,6 +11,12 @@ There are 72 data rows: two state blocks for each of 36 spatial runs.
 `mms_convergence_componentwise.csv` supplements these block averages with
 all twelve componentwise `L2` and `Linf` errors for the primary alternating
 scheme. `mms_temporal_sanity.csv` documents the finest-grid tolerance check.
+On the finest cubic mesh, the smallest componentwise EOC is `3.8755` in
+`L2` and `3.9412` in `Linf`; hence the block averages do not hide a weak
+component. Tightening the ROCK4 tolerance from `1e-12` to `1e-13` changes
+the two block-average errors by approximately `0.013%` and `0.000012%`,
+respectively, confirming that the reported finest-mesh errors are spatially
+limited.
 
 Finest-grid EOCs are:
 
@@ -54,3 +60,7 @@ JULIA_NUM_THREADS=1 julia --compiled-modules=no \
 `rotating_steady_mesh_check.csv` records the steady-profile initialization
 check on 4, 8, and 16 cells. It is regenerated with
 `run_rotating_steady_mesh_check.jl`.
+For the cubic discretization, the finest-pair `Linf` EOCs are `3.9868` for
+`f1` and `3.7297` for `v2`; on 16 cells their relative `Linf` errors are
+`6.15e-9` and `5.21e-10`. The maximum instantaneous ledger defect is at
+roundoff on every mesh.
