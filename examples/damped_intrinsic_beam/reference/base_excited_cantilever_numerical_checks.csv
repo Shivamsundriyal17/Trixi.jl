@@ -1,0 +1,16 @@
+check,value,comparison,relative_or_absolute_difference
+gravity_equilibrium_residual,4.225639815290482e-12,zero,4.225639815290482e-12
+linear_frequency_hz_k4_n2,9.12496372335523,not_applicable,not_applicable
+linear_damping_ratio_k3_n2,0.006694703271930691,eta_d_omega_1_over_2,not_applicable
+spatial_transverse_k4_n2_vs_k3_n4,0.7025459910217654,0.7037066317029409,0.001649334438823567
+spatial_longitudinal_k4_n2_vs_k3_n4,-0.3700157595912166,-0.37178114384079464,0.004748471729361941
+temporal_max_tip_history_difference,1.538815597168508e-7,tolerance_quartering,1.538815597168508e-7
+temporal_transverse_loose,0.7695349362923853,0.7695349170963762,2.494496703924523e-8
+temporal_longitudinal_loose,-0.4919103182159358,-0.49191027786009156,8.204104405851436e-8
+maximum_axial_strain_02g,4.1880705320174544e-7,inextensible_limit,4.1880705320174544e-7
+maximum_shear_strain_02g,1.0636467649772453e-6,unshearable_limit,1.0636467649772453e-6
+maximum_axial_strain_05g,7.03786340371817e-7,inextensible_limit,7.03786340371817e-7
+maximum_shear_strain_05g,1.6575455862463464e-6,unshearable_limit,1.6575455862463464e-6
+maximum_out_of_plane_state,5.790242955568496e-20,planar_invariance,5.790242955568496e-20
+cycle_to_cycle_transverse_change_05g,0.00018260679587046602,transverse_peak,0.00022007847425369222
+cycle_to_cycle_longitudinal_change_05g,0.001461643550114029,longitudinal_minimum,0.002085182848935119
