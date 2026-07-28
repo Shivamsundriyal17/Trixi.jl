@@ -44,6 +44,8 @@ LDG and BR1 auxiliary traces, final time `T=1`, and absolute/relative ROCK4
 tolerances `1e-12`. The example environment pins
 `OrdinaryDiffEqStabilizedRK` to `1.4.0`. The CSV preamble records the Julia
 version, Trixi commit and worktree state, command, and numerical settings.
+The campaign also writes a sibling `_componentwise.csv` containing `L2` and
+`Linf` errors and EOCs for all twelve primary fields.
 
 For a smaller smoke run, override comma-separated settings through environment
 variables:
@@ -57,6 +59,18 @@ MMS_POLYDEGS=2 MMS_REFINEMENT_LEVELS=2,3 MMS_AUXILIARY_FLUXES=alternating \
 Available variables are `MMS_POLYDEGS`, `MMS_REFINEMENT_LEVELS`,
 `MMS_SIGMAS`, `MMS_AUXILIARY_FLUXES`, and `MMS_TIME_TOL`. Refinement level
 `r` means `2^r` uniform cells.
+
+Run the targeted finest-grid temporal-error check with:
+
+```bash
+JULIA_NUM_THREADS=1 julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/run_mms_temporal_sanity.jl
+```
+
+Its defaults are `k=3`, `N=128`, alternating LDG, and ROCK4 tolerances
+`1e-8,1e-10,1e-12,1e-13`. The `MMS_TEMPORAL_*` environment variables
+override these settings.
 
 The two canonical nonsmooth/nonhomogeneous experiments are:
 
@@ -100,8 +114,17 @@ Use `ROTATING_CAMPAIGN_QUICK=true` for a four-case end-to-end smoke test.
 Set `ROTATING_REUSE_RESULTS=true` to regenerate only the summary from existing
 serialized results. Individual cases can be configured through
 `ROTATING_DAMPING_MULTIPLIER`, `ROTATING_STEADY_INITIAL`,
-`ROTATING_T_END`, `ROTATING_SAVE_COUNT`, and
-`ROTATING_RECORD_LEDGER`.
+`ROTATING_T_END`, `ROTATING_SAVE_COUNT`, `ROTATING_RECORD_LEDGER`,
+`ROTATING_POLYDEG`, `ROTATING_REFINEMENT_LEVEL`, and `ROTATING_CFL`.
+
+Run the inexpensive steady-initialized mesh check, which separates spatial
+steady-branch drift from spin-up relaxation, with:
+
+```bash
+JULIA_NUM_THREADS=1 julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/run_rotating_steady_mesh_check.jl
+```
 
 ## Optional visualization
 
