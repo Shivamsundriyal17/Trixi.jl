@@ -77,7 +77,7 @@ diagnostics but do not load a plotting package or write figures.
 Run the complete rotating-beam validation campaign with:
 
 ```bash
-JULIA_NUM_THREADS=8 julia --compiled-modules=no \
+JULIA_NUM_THREADS=1 julia --compiled-modules=no \
   --project=examples/damped_intrinsic_beam \
   examples/damped_intrinsic_beam/run_rotating_beam_campaign.jl
 ```
@@ -90,6 +90,10 @@ interface, boundary, physical-root, and SAT-data contributions at every
 accepted time step. The saved-state analysis separately checks the
 instantaneous semi-discrete ledger and errors against the analytic rotating
 branch.
+
+The reference campaign uses one Julia thread. Since this test has only eight
+elements, additional threads add scheduling overhead without changing the
+numerical protocol.
 
 Use `ROTATING_CAMPAIGN_QUICK=true` for a four-case end-to-end smoke test.
 Set `ROTATING_REUSE_RESULTS=true` to regenerate only the summary from existing

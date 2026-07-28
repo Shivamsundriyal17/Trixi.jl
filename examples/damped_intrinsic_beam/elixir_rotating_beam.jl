@@ -97,7 +97,6 @@ capacity_abs_flux = equations_hyperbolic.capacity_matrix *
 damping_operator_inverse = iszero(damping_multiplier) ?
                            zeros(6, 6) :
                            inv(Matrix(equations_hyperbolic.damping_operator))
-ledger_parabolic_workspace = similar(ode.u0)
 
 function beam_quadrature_sum(function_)
     value = 0.0
@@ -109,10 +108,25 @@ function beam_quadrature_sum(function_)
 end
 
 function rotating_ledger_terms(state, t)
-    Trixi.rhs_parabolic!(ledger_parabolic_workspace, state, semi, t)
+    # Only the auxiliary gradient is needed here. Calling `rhs_parabolic!`
+    # would also form the viscous flux, its divergence, and all source terms
+    # after every accepted Runge--Kutta step.
+    state_parabolic = Trixi.wrap_array(state, mesh, equations_parabolic,
+                                       solver, semi.cache_parabolic)
+    viscous_container = semi.cache_parabolic.viscous_container
+    Trixi.transform_variables!(viscous_container.u_transformed,
+                               state_parabolic, mesh, equations_parabolic,
+                               solver, solver_parabolic, semi.cache,
+                               semi.cache_parabolic)
+    Trixi.calc_gradient!(viscous_container.gradients,
+                         viscous_container.u_transformed, t, mesh,
+                         equations_parabolic,
+                         semi.boundary_conditions_parabolic, solver,
+                         solver_parabolic, semi.cache,
+                         semi.cache_parabolic)
     state_array = reshape(state, 12, length(quadrature_weights),
                           length(volume_jacobians))
-    gradients = semi.cache_parabolic.viscous_container.gradients
+    gradients = viscous_container.gradients
 
     material_dissipation = if iszero(damping_multiplier)
         0.0
@@ -169,10 +183,11 @@ function rotating_ledger_terms(state, t)
 end
 
 # The paper protocol uses k=3, eight cells, alternating auxiliary traces, and
-# the conservative CFL 0.01. The first dt is a dummy value replaced by the
-# callback before the first step.
+# the conservative CFL 0.01. Since the mesh and characteristic speeds are
+# constant, the CFL step computed at t=0 remains valid throughout the run.
 cfl = 0.01
 stepsize_callback = StepsizeCallback(cfl = cfl)
+time_step = stepsize_callback(ode)
 save_count = parse(Int, get(ENV, "ROTATING_SAVE_COUNT", "401"))
 save_times = range(first(tspan), last(tspan); length = save_count)
 
@@ -201,14 +216,11 @@ end
 ledger_callback = DiscreteCallback(ledger_condition, update_ledger!;
                                    initialize = initialize_ledger_callback,
                                    save_positions = (false, false))
-callbacks = record_online_ledger ?
-            CallbackSet(stepsize_callback, ledger_callback) :
-            stepsize_callback
 
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
-            dt = 1.0,
+            dt = time_step,
             adaptive = false,
-            callback = callbacks,
+            callback = record_online_ledger ? ledger_callback : nothing,
             saveat = save_times,
             ode_default_options()...)
 
