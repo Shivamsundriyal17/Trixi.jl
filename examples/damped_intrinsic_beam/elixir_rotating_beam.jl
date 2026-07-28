@@ -62,10 +62,11 @@ boundary_condition = BoundaryConditionDampedIntrinsicBeam(;
                                                           left_velocity = root_velocity)
 boundary_conditions = (boundary_condition, boundary_condition)
 
-polydeg = 3
+polydeg = parse(Int, get(ENV, "ROTATING_POLYDEG", "3"))
 solver = DGSEM(polydeg = polydeg, surface_flux = flux_upwind)
 solver_parabolic = ViscousFormulationLocalDG()
-initial_refinement_level = 3
+initial_refinement_level = parse(Int,
+                                 get(ENV, "ROTATING_REFINEMENT_LEVEL", "3"))
 mesh = TreeMesh((0.0,), (beam_length,);
                 initial_refinement_level,
                 n_cells_max = 10_000,
@@ -185,7 +186,7 @@ end
 # The paper protocol uses k=3, eight cells, alternating auxiliary traces, and
 # the conservative CFL 0.01. Since the mesh and characteristic speeds are
 # constant, the CFL step computed at t=0 remains valid throughout the run.
-cfl = 0.01
+cfl = parse(Float64, get(ENV, "ROTATING_CFL", "0.01"))
 stepsize_callback = StepsizeCallback(cfl = cfl)
 time_step = stepsize_callback(ode)
 save_count = parse(Int, get(ENV, "ROTATING_SAVE_COUNT", "401"))

@@ -26,16 +26,40 @@ gray = RGB(0.25, 0.25, 0.25)
 configuration_plot = plot(xlabel = "x₁", ylabel = "x₂",
                           title = "(a) Co-rotating centerline",
                           legend = :bottomleft, grid = :on)
-configuration_times = (0.0, 1.0, 3.0, 10.0, 40.0)
+tip_displacements = map(eachindex(baseline.times)) do index
+    _, centerline = reconstruct_centerline(baseline.node_coordinates,
+                                           baseline.states[index],
+                                           baseline.flexibility_matrix,
+                                           baseline.initial_curvature)
+    centerline[2, end]
+end
+ramp_index = argmin(abs.(baseline.times .- baseline.ramp_duration))
+rebound_search = (ramp_index + 1):(length(baseline.times) - 1)
+rebound_index = findfirst(rebound_search) do index
+    tip_displacements[index - 1] < tip_displacements[index] &&
+        tip_displacements[index] >= tip_displacements[index + 1] &&
+        tip_displacements[index] > 0
+end
+rebound_index = isnothing(rebound_index) ?
+                argmax(tip_displacements) :
+                rebound_search[rebound_index]
+late_index = argmin(abs.(baseline.times .-
+                         min(10.0, baseline.times[end])))
+configuration_indices = unique((1, ramp_index, rebound_index,
+                                late_index, length(baseline.times)))
 configuration_colors = (gray, orange, magenta, green, blue)
-for (time, color) in zip(configuration_times, configuration_colors)
-    index = argmin(abs.(baseline.times .- time))
+for (index, color) in zip(configuration_indices, configuration_colors)
+    time = baseline.times[index]
     _, centerline = reconstruct_centerline(baseline.node_coordinates,
                                            baseline.states[index],
                                            baseline.flexibility_matrix,
                                            baseline.initial_curvature)
     plot!(configuration_plot, centerline[1, :], centerline[2, :],
-          color = color, linewidth = 2, label = "t=$(time)")
+          color = color, linewidth = 2,
+          label = "t=$(round(time, digits = 2))")
+    scatter!(configuration_plot, [centerline[1, end]],
+             [centerline[2, end]], color = color, markersize = 3,
+             markerstrokewidth = 0, label = "")
 end
 steady_state = reduce(hcat, baseline.steady_states)
 _, steady_centerline = reconstruct_centerline(baseline.node_coordinates,
@@ -45,6 +69,9 @@ _, steady_centerline = reconstruct_centerline(baseline.node_coordinates,
 plot!(configuration_plot, steady_centerline[1, :],
       steady_centerline[2, :], color = :black, linestyle = :dash,
       linewidth = 2, label = "analytic steady")
+scatter!(configuration_plot, [steady_centerline[1, end]],
+         [steady_centerline[2, end]], color = :black, markersize = 3,
+         marker = :star5, label = "")
 
 energy_plot = plot(xlabel = "time", ylabel = "Eₕ / E⋆",
                    title = "(b) Normalized energy",
