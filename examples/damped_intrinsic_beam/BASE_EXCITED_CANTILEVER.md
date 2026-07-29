@@ -46,18 +46,38 @@ julia --project=examples/damped_intrinsic_beam \
   examples/damped_intrinsic_beam/elixir_base_excited_cantilever.jl
 ```
 
-Trace a stable branch by increasing normalized frequency:
+The article's horizontal coordinate is excitation frequency normalized by the
+system natural frequency. The campaign therefore normalizes by the first
+eigenfrequency of the discrete, gravity-loaded straight equilibrium. The
+unloaded Euler--Bernoulli value is retained in the output as a separate
+diagnostic; it is not used for matching the experimental markers.
+
+Run any one of the archived protocols by name:
 
 ```bash
-CANTILEVER_ACCELERATION_RMS_G=0.2 \
-julia --project=examples/damped_intrinsic_beam \
-  examples/damped_intrinsic_beam/run_base_excited_cantilever_sweep.jl
+examples/damped_intrinsic_beam/run_base_excited_cantilever_campaign.sh \
+  02g_upper
 ```
 
-The sweep defaults to two elements of degree four. This is the least expensive
-tested discretization that agrees with four degree-three elements. An isolated
-start near the nonlinear fold can converge to the wrong stable branch; use the
-sweep for frequency-response comparisons.
+The four baseline campaign names are `02g_upper`, `02g_lower`, `05g_upper`,
+and `05g_lower`. The lower branches are deliberately swept from high to low
+frequency. Two targeted refinement checks are named `02g_refined_lower` and
+`05g_refined_upper`. The wrapper contains the exact frequency paths, cycle
+budgets, tolerances, discretizations, and output names used for the archived
+results.
+
+Each accepted point writes its CSV row and continuation state atomically.
+The current frequency is also checkpointed before every extra settling block,
+so an interrupted expensive run repeats at most one block. Per-frequency state
+archives make local fold refinement possible without retracing the entire
+branch. Set `CANTILEVER_SWEEP_RESUME=false` to start a campaign from its
+initial equilibrium instead of its checkpoint.
+
+The baseline uses two elements of degree four. This is the least expensive
+tested discretization that agrees with four degree-three elements at the
+checked response points. An isolated fixed-frequency start in the coexistence
+region can converge to either attractor; branch direction and continuation
+state are therefore part of the numerical protocol.
 
 On the current Julia 1.11/SciML combination, this Trixi branch has an unrelated
 manual-precompile assertion. Until that upstream compatibility issue is fixed,
@@ -69,7 +89,22 @@ Important controls include:
 - `CANTILEVER_SWEEP_NORMALIZED_FREQUENCIES`;
 - `CANTILEVER_SWEEP_RELTOL` and `CANTILEVER_SWEEP_ABSTOL`;
 - `CANTILEVER_SWEEP_PERIODICITY_TOLERANCE`;
-- `CANTILEVER_POLYDEG` and `CANTILEVER_REFINEMENT_LEVEL`.
+- `CANTILEVER_POLYDEG` and `CANTILEVER_REFINEMENT_LEVEL`;
+- `CANTILEVER_SWEEP_RESUME` and `CANTILEVER_SWEEP_ARCHIVE_STATES`.
+
+After all four baseline campaigns are present, reproduce the comparison tables
+with:
+
+```bash
+python3 examples/damped_intrinsic_beam/analyze_base_excited_cantilever_sweeps.py
+```
+
+Generate a four-panel inspection plot from the archived comparison with:
+
+```bash
+python3 \
+  examples/damped_intrinsic_beam/plot_base_excited_cantilever_comparison.py
+```
 
 ## Experimental marker extraction
 
@@ -83,40 +118,97 @@ python3 examples/damped_intrinsic_beam/extract_farokhi_2022_frequency_response.p
   /tmp/farokhi_2022_frequency_response.csv
 ```
 
-The PDF is not redistributed. Marker uncertainty still includes plot-axis
-rounding, line thickness, and uncertainty in the original image-processing
-experiment.
+The PDF is not redistributed. Figure 4(b) has displayed limits
+\([-0.65,0.05]\), rather than tick-aligned limits \([-0.7,0]\). The extractor
+therefore calibrates the longitudinal coordinate from the labeled 0 and -0.6
+ticks. Treating the plot-box edges as those tick values introduces a spurious
+\(-0.05L\) offset in every 0.2g longitudinal marker. Marker uncertainty still
+includes plot-axis rounding, line thickness, and uncertainty in the original
+image-processing experiment.
 
 ## Current strict assessment
 
-The archived checks support the following conclusions:
+The table reports RMSE normalized by the largest experimental magnitude on
+each accepted branch. An upper marker is the larger response at a duplicated
+frequency; a lower marker is the smaller one. Rows that exceed the campaign's
+periodicity tolerance, including the post-fold jump in the 0.5g up-sweep, are
+not counted.
 
-- Two degree-three elements are not adequate: at \(f/f_1=1.0082\), refinement
-  raises the transverse amplitude by 35.7% (the coarse value is 26.3% below
-  the refined result).
-- Two degree-four elements and four degree-three elements agree to 0.17% in
-  transverse amplitude and 0.48% in longitudinal amplitude.
-- Reducing the time tolerances and maximum step by a factor of four changes
-  the reconstructed tip history by at most \(1.54\times10^{-7}\).
-- At 0.2g and \(f/f_1=1.0206\), the converged upper branch gives
-  \(w_\mathrm{tip}=0.7690\) and \(u_\mathrm{tip,min}=-0.4907\), versus
-  digitized experimental values \(0.7864\) and \(-0.5771\). Transverse
-  agreement is strong (2.2%); longitudinal shortening is underpredicted by
-  about 15%.
-- At 0.5g and the same normalized frequency, the converged-amplitude estimate
-  gives \(w_\mathrm{tip}=0.8298\) and \(u_\mathrm{tip,min}=-0.7010\), versus
-  interpolated experimental values \(0.8178\) and \(-0.6236\). Transverse
-  agreement remains strong (1.5%); longitudinal shortening is overpredicted
-  by about 12%.
+| acceleration | branch | points | transverse NRMSE | longitudinal NRMSE | max periodicity defect |
+|:---:|:---:|---:|---:|---:|---:|
+| 0.2g | upper | 16 | 2.20% | 2.79% | \(2.00\times10^{-3}\) |
+| 0.2g | lower | 14 | 17.53% | 33.57% | \(1.81\times10^{-4}\) |
+| 0.5g | upper | 18 | 1.86% | 3.95% | \(4.71\times10^{-4}\) |
+| 0.5g | lower | 14 | 9.09% | 17.15% | \(1.92\times10^{-4}\) |
 
-These are good selected-point results, but not yet a complete publication
-validation. Before using the experiment in a paper, run and archive the full
-upper and lower stable branches at both acceleration levels, add a cycle work
-ledger, and confirm at least one more point with the degree-three/four-element
-discretization.
+The upper branches are genuinely strong validation results, not merely
+selected-point agreement. At 0.2g and normalized frequency 1.01855, for
+example, the numerical and experimental transverse amplitudes are 0.76290
+and 0.76221; the longitudinal minima are -0.47702 and -0.47714. At 0.5g,
+the numerical upper branch is within 0.2% transversely at normalized
+frequency 1.04118. The longitudinal error there is 2.9%.
+
+The lower branches show a systematic amplitude bias. At 0.2g and normalized
+frequency 1.04140, the degree-four/two-element transverse amplitude is
+0.18941, versus 0.13905 experimentally. Repeating that lower-branch point
+with degree three on four elements gives 0.18925 and changes the longitudinal
+magnitude by only 0.17%. Thus spatial under-resolution does not explain this
+particular disagreement; damping-model, clamp, and specimen-model differences
+are more plausible hypotheses. They are not identified parameters and should
+not be tuned after seeing the validation data.
+
+At 0.5g the numerical up-sweep remains on the upper branch through normalized
+frequency 1.04118, then jumps before an accepted solution is obtained at
+1.04323. The experimental upper markers continue to approximately 1.0453.
+This brackets a discrepancy in the fold region, but it does not locate the
+numerical saddle-node: smaller steps restarted from the archived 1.04118
+state are required before making a bifurcation claim.
+
+## Cycle energy ledger
+
+For the final measured cycle, the code checks
+
+\[
+ \Delta E + D_{\mathrm{KV}} + D_{\mathrm{jump}} + D_L + D_R
+ - W_{\mathrm{root}} - W_{\mathrm{SAT}} = r.
+\]
+
+Here \(E\) includes intrinsic and gravitational potential energy,
+\(D_{\mathrm{KV}}\) is physical Kelvin--Voigt dissipation, and
+\(D_{\mathrm{jump}}\) is upwind interface dissipation. Since the imposed
+root velocity enters through an SAT boundary state, the interpretable net
+boundary loss is \(D_L+D_R-W_{\mathrm{SAT}}\); reporting \(D_L\) or
+\(W_{\mathrm{SAT}}\) alone exposes a large but artificial cancellation.
+
+At the maximum accepted upper response of each campaign, the percentages of
+physical root work are:
+
+| acceleration | \(\Delta E\) | Kelvin--Voigt | interface | net boundary |
+|:---:|---:|---:|---:|---:|
+| 0.2g | 0.58% | 94.90% | 1.89% | 2.63% |
+| 0.5g | 0.013% | 77.76% | 8.17% | 14.05% |
+
+The compact residual divided by physical root work is below
+\(1.6\times10^{-6}\). Closure is therefore excellent, but closure alone does
+not make the numerical losses physical. The 0.5g extreme response assigns
+about 22% of the input work to interface and net boundary dissipation. That
+fraction must be checked on the degree-three/four-element upper branch before
+the energy decomposition is used as a paper result.
+
+The old selected-point file is retained only as a legacy regression record.
+Its rows used shorter settling runs, and its original 0.2g longitudinal
+markers contained the Figure 4(b) axis-offset error. Use the branch comparison
+and summary files for scientific conclusions.
 
 Archived files:
 
 - `reference/farokhi_2022_experimental_frequency_response.csv`;
-- `reference/base_excited_cantilever_validation.csv`;
-- `reference/base_excited_cantilever_numerical_checks.csv`.
+- `reference/farokhi_02g_k4n2_sweep.csv`;
+- `reference/farokhi_02g_k4n2_down_sweep.csv`;
+- `reference/farokhi_05g_k4n2_up_sweep.csv`;
+- `reference/farokhi_05g_k4n2_down_sweep.csv`;
+- `reference/base_excited_cantilever_branch_comparison.csv`;
+- `reference/base_excited_cantilever_branch_summary.csv`;
+- `reference/base_excited_cantilever_energy_summary.csv`;
+- `reference/base_excited_cantilever_validation.csv` (legacy);
+- `reference/base_excited_cantilever_numerical_checks.csv` (legacy).

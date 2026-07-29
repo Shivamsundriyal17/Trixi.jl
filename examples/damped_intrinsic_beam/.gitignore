@@ -3,5 +3,7 @@
 /results/*.png
 /results/*.mp4
 /results/*.jls
+/results/*.txt
+__pycache__/
 !/Manifest.toml
 !/LocalPreferences.toml

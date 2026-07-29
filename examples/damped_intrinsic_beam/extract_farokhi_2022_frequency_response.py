@@ -58,7 +58,10 @@ FIGURE_4_TRANSVERSE = Axes(
     71.378, 262.454, 477.300, 295.323, 0.8, 1.2, 0.0, 0.9
 )
 FIGURE_4_LONGITUDINAL = Axes(
-    303.028, 491.598, 296.594, 476.185, 0.8, 1.2, 0.0, -0.7
+    # Figure 4(b) has plot limits [-0.65, 0.05], so the plot-box edges
+    # are not data values 0 and -0.7. Calibrate instead with the labeled
+    # 0 and -0.6 tick marks to avoid a spurious -0.05 displacement offset.
+    303.028, 491.598, 309.42198, 463.357, 0.8, 1.2, 0.0, -0.6
 )
 FIGURE_7_TRANSVERSE = Axes(
     71.378, 262.454, 250.777, 68.800, 0.8, 1.2, 0.0, 1.0
@@ -187,7 +190,8 @@ def main() -> None:
             "longitudinal_minimum",
             "figure",
         ]
-        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        writer = csv.DictWriter(stream, fieldnames=fieldnames,
+                                lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 

@@ -22,6 +22,7 @@ const FAROKHI_L = 81.5e-3
 const FAROKHI_G = 9.81
 const FAROKHI_NU = 0.30
 const FAROKHI_SHEAR_CORRECTION = 5.0 / 6.0
+const FAROKHI_REFERENCE_OMEGA1 = 1.875104068711961^2
 
 const FAROKHI_A = FAROKHI_B * FAROKHI_H
 const FAROKHI_I_WEAK = FAROKHI_B * FAROKHI_H^3 / 12.0
@@ -348,6 +349,161 @@ function reconstruct_tip(state)
     return SVector(vertical - 1.0, transverse, tip_angle)
 end
 
+capacity_abs_flux = equations_hyperbolic.capacity_matrix *
+                    equations_hyperbolic.propagation_matrix_abs
+
+function beam_quadrature_sum(function_)
+    value = 0.0
+    for element in axes(node_coordinates, 3), i in eachindex(solver.basis.weights)
+        value += volume_jacobians[element] * solver.basis.weights[i] *
+                 function_(i, element)
+    end
+    return value
+end
+
+function gravitational_potential(state)
+    state_array = reshape(state, 12, nnodes, nelements)
+    reconstruct_angle!(angle_cache, state, rhs_parameters)
+    vertical_positions = zeros(nnodes, nelements)
+    left_vertical = 0.0
+
+    for element in element_order
+        jacobian = volume_jacobians[element]
+        vertical_derivative = zeros(nnodes)
+        for i in 1:nnodes
+            f1 = state_array[7, i, element]
+            f2 = state_array[8, i, element]
+            gamma1 = 1.0 + flexibility_matrix[1, 1] * f1
+            gamma2 = flexibility_matrix[2, 2] * f2
+            angle = angle_cache[i, element]
+            vertical_derivative[i] =
+                cos(angle) * gamma1 - sin(angle) * gamma2
+        end
+        vertical_positions[:, element] .=
+            left_vertical .+
+            jacobian .* (integration_matrix * vertical_derivative)
+        left_vertical += jacobian *
+                         dot(solver.basis.weights, vertical_derivative)
+    end
+
+    return FAROKHI_GAMMA * beam_quadrature_sum() do i, element
+        vertical_positions[i, element]
+    end
+end
+
+function cantilever_total_energy(state)
+    intrinsic_energy = Trixi.integrate(entropy, state, semi;
+                                       normalize = false)
+    return intrinsic_energy + gravitational_potential(state)
+end
+
+function cantilever_ledger_terms(state, t)
+    # Only the auxiliary gradient is needed for the Kelvin--Voigt resultant.
+    # Reusing Trixi's LDG gradient makes this diagnostic consistent with the
+    # semidiscrete damping operator.
+    state_parabolic = Trixi.wrap_array(state, mesh, equations_parabolic,
+                                       solver, semi.cache_parabolic)
+    viscous_container = semi.cache_parabolic.viscous_container
+    Trixi.transform_variables!(viscous_container.u_transformed,
+                               state_parabolic, mesh, equations_parabolic,
+                               solver, solver_parabolic, semi.cache,
+                               semi.cache_parabolic)
+    Trixi.calc_gradient!(viscous_container.gradients,
+                         viscous_container.u_transformed, t, mesh,
+                         equations_parabolic,
+                         semi.boundary_conditions_parabolic, solver,
+                         solver_parabolic, semi.cache,
+                         semi.cache_parabolic)
+
+    state_array = reshape(state, 12, nnodes, nelements)
+    gradients = viscous_container.gradients
+    material_dissipation = beam_quadrature_sum() do i, element
+        state_node = SVector{12}(state_array[:, i, element])
+        gradient_node = SVector{12}(gradients[:, i, element])
+        damping_resultant =
+            intrinsic_beam_damping_resultant(state_node, gradient_node,
+                                              equations_parabolic)
+        damping_resultant[6]^2 / FAROKHI_ETA_D
+    end
+
+    jump_dissipation = 0.0
+    for index in 1:(length(element_order) - 1)
+        left_element = element_order[index]
+        right_element = element_order[index + 1]
+        jump = SVector{12}(state_array[:, end, left_element] -
+                           state_array[:, 1, right_element])
+        jump_dissipation += 0.5 *
+                            dot(jump, capacity_abs_flux * jump)
+    end
+
+    left_element = first(element_order)
+    right_element = last(element_order)
+    left_state = SVector{12}(state_array[:, 1, left_element])
+    right_state = SVector{12}(state_array[:, end, right_element])
+    left_velocity = SVector{6}(left_state[1:6])
+    left_resultant = SVector{6}(left_state[7:12])
+    right_resultant = SVector{6}(right_state[7:12])
+    left_gradient = SVector{12}(gradients[:, 1, left_element])
+    left_damping_resultant =
+        intrinsic_beam_damping_resultant(left_state, left_gradient,
+                                          equations_parabolic)
+    prescribed_velocity = root_velocity(SVector(0.0), t,
+                                        equations_hyperbolic)
+
+    left_boundary_dissipation =
+        dot(left_velocity,
+            equations_hyperbolic.left_impedance * left_velocity)
+    right_boundary_dissipation =
+        dot(right_resultant,
+            equations_hyperbolic.right_impedance * right_resultant)
+    physical_root_power =
+        -dot(prescribed_velocity, left_resultant + left_damping_resultant)
+    sat_data_power =
+        dot(prescribed_velocity,
+            equations_hyperbolic.left_impedance * left_velocity)
+
+    return SVector(material_dissipation, jump_dissipation,
+                   left_boundary_dissipation, right_boundary_dissipation,
+                   physical_root_power, sat_data_power)
+end
+
+function cantilever_cycle_ledger(states, times)
+    length(states) == length(times) ||
+        throw(DimensionMismatch("states and times must have equal lengths"))
+    length(states) >= 2 ||
+        throw(ArgumentError("at least two cycle samples are required"))
+
+    integrated_terms = zeros(6)
+    previous_terms = cantilever_ledger_terms(first(states), first(times))
+    for index in 2:length(states)
+        current_terms = cantilever_ledger_terms(states[index], times[index])
+        step = times[index] - times[index - 1]
+        integrated_terms .+=
+            0.5 * step .* (previous_terms .+ current_terms)
+        previous_terms = current_terms
+    end
+
+    energy_change = cantilever_total_energy(last(states)) -
+                    cantilever_total_energy(first(states))
+    residual = energy_change + sum(integrated_terms[1:4]) -
+               sum(integrated_terms[5:6])
+    scale = max(abs(energy_change),
+                sum(abs, integrated_terms[1:4]),
+                sum(abs, integrated_terms[5:6]),
+                eps(Float64))
+
+    return (;
+            total_energy_change = energy_change,
+            material_dissipation = integrated_terms[1],
+            jump_dissipation = integrated_terms[2],
+            left_boundary_dissipation = integrated_terms[3],
+            right_boundary_dissipation = integrated_terms[4],
+            physical_root_work = integrated_terms[5],
+            sat_data_work = integrated_terms[6],
+            ledger_residual = residual,
+            relative_ledger_residual = abs(residual) / scale)
+end
+
 tip_history = [reconstruct_tip(state) for state in solution.u]
 last_cycle = (length(tip_history) - samples_per_cycle):length(tip_history)
 previous_cycle = ((length(tip_history) - 2 * samples_per_cycle):
@@ -365,7 +521,8 @@ result = (;
           acceleration_rms_g,
           frequency_hz,
           omega,
-          normalized_frequency = omega / 1.875104068711961^2,
+          frequency_over_unloaded_omega1 =
+              omega / FAROKHI_REFERENCE_OMEGA1,
           acceleration,
           constraint_multiplier,
           polydeg,

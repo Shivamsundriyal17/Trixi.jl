@@ -64,3 +64,50 @@ For the cubic discretization, the finest-pair `Linf` EOCs are `3.9868` for
 `f1` and `3.7297` for `v2`; on 16 cells their relative `Linf` errors are
 `6.15e-9` and `5.21e-10`. The maximum instantaneous ledger defect is at
 roundoff on every mesh.
+
+## Base-excited cantilever
+
+The `farokhi_*_k4n2_*.csv` files are the raw degree-four/two-element
+continuation campaigns for the 0.2g and 0.5g experimental comparison. The
+up-sweep files intentionally retain post-fold or maximum-cycle rows; the
+analysis script accepts only the explicitly documented frequency and
+periodicity ranges. The two down-sweeps contain the strict lower stable
+branches. `farokhi_02g_k3n4_refined_check.csv` is the independent
+degree-three/four-element lower-branch check.
+
+`base_excited_cantilever_branch_comparison.csv` contains every accepted
+numerical/experimental pair. `base_excited_cantilever_branch_summary.csv`
+contains the branchwise errors, and
+`base_excited_cantilever_energy_summary.csv` contains the final-cycle work
+decomposition at each branch's maximum accepted numerical response. The raw
+experimental markers are in
+`farokhi_2022_experimental_frequency_response.csv`.
+
+Regenerate the four baseline raw campaigns with:
+
+```bash
+for campaign in 02g_upper 02g_lower 05g_upper 05g_lower; do
+  CANTILEVER_SWEEP_RESUME=false \
+    examples/damped_intrinsic_beam/run_base_excited_cantilever_campaign.sh \
+    "${campaign}"
+done
+```
+
+Then regenerate the derived tables with:
+
+```bash
+python3 examples/damped_intrinsic_beam/analyze_base_excited_cantilever_sweeps.py \
+  --results-directory examples/damped_intrinsic_beam/results \
+  --output-directory examples/damped_intrinsic_beam/results
+```
+
+The exact frequency paths, cycle budgets, tolerances, and output names are
+versioned in `run_base_excited_cantilever_campaign.sh`. Runs are restartable
+both between frequencies and between additional settling blocks. See
+`../BASE_EXCITED_CANTILEVER.md` for the normalization, marker extraction,
+branch-selection rules, strict interpretation, and energy identity.
+
+`base_excited_cantilever_validation.csv` and
+`base_excited_cantilever_numerical_checks.csv` predate the full campaigns.
+They are retained as legacy regression records and must not be used instead
+of the branch tables for validation claims.

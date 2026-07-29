@@ -126,6 +126,20 @@ JULIA_NUM_THREADS=1 julia --compiled-modules=no \
   examples/damped_intrinsic_beam/run_rotating_steady_mesh_check.jl
 ```
 
+The base-excited experimental cantilever benchmark has its own model mapping,
+continuation protocols, quantitative assessment, and work-ledger discussion
+in [`BASE_EXCITED_CANTILEVER.md`](BASE_EXCITED_CANTILEVER.md). For example,
+run the 0.2g upper branch with:
+
+```bash
+examples/damped_intrinsic_beam/run_base_excited_cantilever_campaign.sh \
+  02g_upper
+```
+
+The four baseline campaigns and their experimental comparisons are archived
+under `reference/`; generated checkpoints and per-frequency states remain in
+the ignored `results/` directory.
+
 ## Optional visualization
 
 Exporters run the simulation environment and save plain Julia arrays:
