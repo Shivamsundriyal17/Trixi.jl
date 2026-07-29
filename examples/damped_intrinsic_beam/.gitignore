@@ -1,9 +1,11 @@
 /results/*.csv
 /results/*.pdf
 /results/*.png
+/results/*.gif
 /results/*.mp4
 /results/*.jls
 /results/*.txt
+/results/**/*.csv
 __pycache__/
 !/Manifest.toml
 !/LocalPreferences.toml

@@ -140,6 +140,23 @@ The four baseline campaigns and their experimental comparisons are archived
 under `reference/`; generated checkpoints and per-frequency states remain in
 the ignored `results/` directory.
 
+Once the `05g_refined_upper` campaign is complete, export and visualize its
+final periodic orbit with:
+
+```bash
+julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/save_base_excited_cantilever_cycle.jl
+
+python3 \
+  examples/damped_intrinsic_beam/plot_base_excited_cantilever_cycle.py
+```
+
+The exporter writes centerline snapshots, tip histories, and a one-cycle
+energy ledger. The plotter produces a static PNG/PDF and a supplementary GIF.
+See [`BASE_EXCITED_CANTILEVER.md`](BASE_EXCITED_CANTILEVER.md) for the
+refinement-diagnostic command and the exact archived state used.
+
 ## Optional visualization
 
 Exporters run the simulation environment and save plain Julia arrays:

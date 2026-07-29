@@ -313,7 +313,11 @@ linear_solver = use_sparse_jacobian ?
 algorithm = Rodas5P(;
                     autodiff = OrdinaryDiffEqRosenbrock.AutoFiniteDiff(),
                     linsolve = linear_solver)
-solution = solve(problem, algorithm;
+setup_only = lowercase(get(ENV, "CANTILEVER_SETUP_ONLY",
+                           "false")) in ("1", "true", "yes")
+solution = setup_only ?
+           nothing :
+           solve(problem, algorithm;
                  reltol = relative_tolerance,
                  abstol = absolute_tolerance,
                  dtmax = maximum_step,
@@ -322,8 +326,10 @@ solution = solve(problem, algorithm;
                  save_everystep = false,
                  maxiters = 10^7)
 
-@assert SciMLBase.successful_retcode(solution)
-@assert all(state -> all(isfinite, state), solution.u)
+if !setup_only
+    @assert SciMLBase.successful_retcode(solution)
+    @assert all(state -> all(isfinite, state), solution.u)
+end
 
 function reconstruct_tip(state)
     state_array = reshape(state, 12, nnodes, nelements)
@@ -504,52 +510,58 @@ function cantilever_cycle_ledger(states, times)
             relative_ledger_residual = abs(residual) / scale)
 end
 
-tip_history = [reconstruct_tip(state) for state in solution.u]
-last_cycle = (length(tip_history) - samples_per_cycle):length(tip_history)
-previous_cycle = ((length(tip_history) - 2 * samples_per_cycle):
-                  (length(tip_history) - samples_per_cycle))
-last_tip = tip_history[last_cycle]
-previous_tip = tip_history[previous_cycle]
+result = if setup_only
+    nothing
+else
+    tip_history = [reconstruct_tip(state) for state in solution.u]
+    last_cycle = (length(tip_history) - samples_per_cycle):length(tip_history)
+    previous_cycle = ((length(tip_history) - 2 * samples_per_cycle):
+                      (length(tip_history) - samples_per_cycle))
+    last_tip = tip_history[last_cycle]
+    previous_tip = tip_history[previous_cycle]
 
-transverse_peak = maximum(abs(value[2]) for value in last_tip)
-longitudinal_minimum = minimum(value[1] for value in last_tip)
-rotation_peak = maximum(abs(value[3]) for value in last_tip)
-periodicity_error = maximum(maximum(abs, last_tip[i] - previous_tip[i])
-                            for i in eachindex(last_tip))
+    transverse_peak = maximum(abs(value[2]) for value in last_tip)
+    longitudinal_minimum = minimum(value[1] for value in last_tip)
+    rotation_peak = maximum(abs(value[3]) for value in last_tip)
+    periodicity_error = maximum(maximum(abs,
+                                         last_tip[i] - previous_tip[i])
+                                for i in eachindex(last_tip))
 
-result = (;
-          acceleration_rms_g,
-          frequency_hz,
-          omega,
-          frequency_over_unloaded_omega1 =
-              omega / FAROKHI_REFERENCE_OMEGA1,
-          acceleration,
-          constraint_multiplier,
-          polydeg,
-          refinement_level,
-          cells = 2^refinement_level,
-          dofs = length(split_problem.u0),
-          jacobian_nonzeros = use_sparse_jacobian ?
-                              nnz(jacobian_prototype) :
-                              length(split_problem.u0)^2,
-          transverse_peak,
-          longitudinal_minimum,
-          rotation_peak,
-          periodicity_error,
-          accepted_steps = solution.destats.naccept,
-          rejected_steps = solution.destats.nreject,
-          rhs_evaluations = solution.destats.nf,
-          retcode = string(solution.retcode))
+    result_local = (;
+                    acceleration_rms_g,
+                    frequency_hz,
+                    omega,
+                    frequency_over_unloaded_omega1 =
+                        omega / FAROKHI_REFERENCE_OMEGA1,
+                    acceleration,
+                    constraint_multiplier,
+                    polydeg,
+                    refinement_level,
+                    cells = 2^refinement_level,
+                    dofs = length(split_problem.u0),
+                    jacobian_nonzeros = use_sparse_jacobian ?
+                                        nnz(jacobian_prototype) :
+                                        length(split_problem.u0)^2,
+                    transverse_peak,
+                    longitudinal_minimum,
+                    rotation_peak,
+                    periodicity_error,
+                    accepted_steps = solution.destats.naccept,
+                    rejected_steps = solution.destats.nreject,
+                    rhs_evaluations = solution.destats.nf,
+                    retcode = string(solution.retcode))
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    @printf("Farokhi cantilever: %.1fg RMS, f = %.6f Hz, Omega = %.8f\n",
-            acceleration_rms_g, frequency_hz, omega)
-    @printf("  k = %d, cells = %d, dofs = %d, constraint multiplier = %.3e\n",
-            polydeg, 2^refinement_level, length(split_problem.u0),
-            constraint_multiplier)
-    @printf("  max|w_tip| = %.10e, min(u_tip) = %.10e, max|psi_tip| = %.10e\n",
-            transverse_peak, longitudinal_minimum, rotation_peak)
-    @printf("  cycle mismatch = %.3e, accepted/rejected = %d/%d, retcode = %s\n",
-            periodicity_error, solution.destats.naccept,
-            solution.destats.nreject, string(solution.retcode))
+    if abspath(PROGRAM_FILE) == @__FILE__
+        @printf("Farokhi cantilever: %.1fg RMS, f = %.6f Hz, Omega = %.8f\n",
+                acceleration_rms_g, frequency_hz, omega)
+        @printf("  k = %d, cells = %d, dofs = %d, constraint multiplier = %.3e\n",
+                polydeg, 2^refinement_level, length(split_problem.u0),
+                constraint_multiplier)
+        @printf("  max|w_tip| = %.10e, min(u_tip) = %.10e, max|psi_tip| = %.10e\n",
+                transverse_peak, longitudinal_minimum, rotation_peak)
+        @printf("  cycle mismatch = %.3e, accepted/rejected = %d/%d, retcode = %s\n",
+                periodicity_error, solution.destats.naccept,
+                solution.destats.nreject, string(solution.retcode))
+    end
+    result_local
 end

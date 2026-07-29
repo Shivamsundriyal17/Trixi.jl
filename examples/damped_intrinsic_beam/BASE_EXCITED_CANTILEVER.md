@@ -110,6 +110,43 @@ python3 \
   examples/damped_intrinsic_beam/plot_base_excited_cantilever_comparison.py
 ```
 
+## Extreme-cycle visualization
+
+After completing the `05g_refined_upper` campaign, export one measured cycle
+from its final accepted state:
+
+```bash
+julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/save_base_excited_cantilever_cycle.jl
+```
+
+The exporter reads the archived state at normalized frequency 1.04118,
+reintegrates exactly one period at 97 uniformly spaced phases, and writes
+plain centerline, tip-response, and cycle-ledger CSV files. It includes the
+cantilever elixir in setup-only mode, so it does not perform a discarded
+default-frequency solve first.
+
+Generate the paper-ready static figure and supplementary GIF with:
+
+```bash
+python3 \
+  examples/damped_intrinsic_beam/plot_base_excited_cantilever_cycle.py
+```
+
+Generate the spatial-refinement and work-partition diagnostic with:
+
+```bash
+python3 \
+  examples/damped_intrinsic_beam/plot_base_excited_cantilever_refinement.py
+```
+
+All outputs go to the ignored `results/` directory. The static cycle figure
+combines centerline snapshots, the tip orbit, and periodic tip histories. The
+refinement figure is deliberately separate because a nearly converged
+transverse response does not imply a grid-independent split between physical
+and numerical dissipation.
+
 ## Experimental marker extraction
 
 The article does not provide a raw frequency-response table. The archived
