@@ -37,6 +37,15 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--refinement",
+        type=Path,
+        default=(
+            example_directory
+            / "reference"
+            / "base_excited_cantilever_refinement_comparison.csv"
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=(
@@ -49,6 +58,7 @@ def main() -> None:
 
     experimental = read_rows(arguments.experimental)
     comparison = read_rows(arguments.comparison)
+    refinement = read_rows(arguments.refinement)
     figure, axes = plt.subplots(
         2, 2, figsize=(8.0, 5.4), sharex=True, constrained_layout=True
     )
@@ -105,6 +115,30 @@ def main() -> None:
                     label=f"Trixi {branch}",
                     zorder=2,
                 )
+
+            refined_rows = sorted(
+                (
+                    row
+                    for row in refinement
+                    if float(row["acceleration_rms_g"]) == acceleration
+                ),
+                key=lambda row: float(row["normalized_frequency"]),
+            )
+            refined_key = f"refined_{component}"
+            axis.scatter(
+                [
+                    float(row["normalized_frequency"])
+                    for row in refined_rows
+                ],
+                [abs(float(row[refined_key])) for row in refined_rows],
+                s=24,
+                marker="D",
+                facecolors="#2f8f5b",
+                edgecolors="white",
+                linewidths=0.5,
+                label="Trixi refined",
+                zorder=4,
+            )
 
             axis.grid(True, linewidth=0.4, alpha=0.35)
             if row_index == 0:

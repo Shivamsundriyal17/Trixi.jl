@@ -48,6 +48,21 @@ CAMPAIGNS = (
     ),
 )
 
+REFINEMENT_CAMPAIGNS = (
+    (
+        "02g_lower",
+        "lower",
+        "farokhi_02g_k3n4_refined_check.csv",
+        "farokhi_02g_k4n2_down_sweep.csv",
+    ),
+    (
+        "05g_upper",
+        "upper",
+        "farokhi_05g_k3n4_refined_up_sweep.csv",
+        "farokhi_05g_k4n2_up_sweep.csv",
+    ),
+)
+
 
 def read_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as stream:
@@ -277,6 +292,127 @@ def write_csv(path: Path, rows: list[dict[str, float | str]]) -> None:
         writer.writerows(rows)
 
 
+def ledger_fractions(row: dict[str, str]) -> dict[str, float]:
+    root_work = float(row["physical_root_work"])
+    net_boundary = (
+        float(row["left_boundary_dissipation"])
+        + float(row["right_boundary_dissipation"])
+        - float(row["sat_data_work"])
+    )
+    compact_residual = (
+        float(row["total_energy_change"])
+        + float(row["material_dissipation"])
+        + float(row["jump_dissipation"])
+        + net_boundary
+        - root_work
+    )
+    return {
+        "physical_root_work": root_work,
+        "energy_change_fraction": (
+            float(row["total_energy_change"]) / root_work
+        ),
+        "material_fraction": (
+            float(row["material_dissipation"]) / root_work
+        ),
+        "jump_fraction": float(row["jump_dissipation"]) / root_work,
+        "net_boundary_fraction": net_boundary / root_work,
+        "numerical_fraction": (
+            float(row["jump_dissipation"]) + net_boundary
+        )
+        / root_work,
+        "compact_relative_ledger_residual": (
+            abs(compact_residual) / root_work
+        ),
+    }
+
+
+def refinement_comparisons(
+    results_directory: Path,
+    experimental_rows: list[dict[str, str]],
+) -> list[dict[str, float | str]]:
+    rows: list[dict[str, float | str]] = []
+    for label, branch, refined_filename, baseline_filename in (
+        REFINEMENT_CAMPAIGNS
+    ):
+        refined_rows = read_rows(results_directory / refined_filename)
+        baseline_rows = read_rows(results_directory / baseline_filename)
+        for refined in refined_rows:
+            frequency = float(refined["normalized_frequency"])
+            baseline = min(
+                baseline_rows,
+                key=lambda row: abs(
+                    float(row["normalized_frequency"]) - frequency
+                ),
+            )
+            if (
+                abs(float(baseline["normalized_frequency"]) - frequency)
+                > 2.0e-6
+            ):
+                raise ValueError(
+                    f"no baseline refinement match for {label} at "
+                    f"{frequency}"
+                )
+            acceleration = float(refined["acceleration_rms_g"])
+            experimental = experimental_marker(
+                experimental_rows, acceleration, frequency, branch
+            )
+            baseline_ledger = ledger_fractions(baseline)
+            refined_ledger = ledger_fractions(refined)
+            baseline_transverse = float(baseline["transverse_peak"])
+            refined_transverse = float(refined["transverse_peak"])
+            baseline_longitudinal = float(baseline["longitudinal_minimum"])
+            refined_longitudinal = float(refined["longitudinal_minimum"])
+            baseline_rotation = float(baseline["rotation_peak"])
+            refined_rotation = float(refined["rotation_peak"])
+            rows.append(
+                {
+                    "campaign": label,
+                    "branch": branch,
+                    "acceleration_rms_g": acceleration,
+                    "normalized_frequency": frequency,
+                    "baseline_transverse": baseline_transverse,
+                    "refined_transverse": refined_transverse,
+                    "transverse_change_fraction": (
+                        (refined_transverse - baseline_transverse)
+                        / abs(refined_transverse)
+                    ),
+                    "experimental_transverse": float(
+                        experimental["transverse_peak"]
+                    ),
+                    "baseline_longitudinal": baseline_longitudinal,
+                    "refined_longitudinal": refined_longitudinal,
+                    "longitudinal_change_fraction": (
+                        (refined_longitudinal - baseline_longitudinal)
+                        / abs(refined_longitudinal)
+                    ),
+                    "experimental_longitudinal": float(
+                        experimental["longitudinal_minimum"]
+                    ),
+                    "baseline_rotation": baseline_rotation,
+                    "refined_rotation": refined_rotation,
+                    "rotation_change_fraction": (
+                        (refined_rotation - baseline_rotation)
+                        / abs(refined_rotation)
+                    ),
+                    "baseline_periodicity_error": float(
+                        baseline["periodicity_error"]
+                    ),
+                    "refined_periodicity_error": float(
+                        refined["periodicity_error"]
+                    ),
+                    **{
+                        f"baseline_{key}": value
+                        for key, value in baseline_ledger.items()
+                    },
+                    **{
+                        f"refined_{key}": value
+                        for key, value in refined_ledger.items()
+                    },
+                }
+            )
+    return rows
+
+
 def main() -> None:
     example_directory = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser()
@@ -329,12 +465,23 @@ def main() -> None:
         arguments.output_directory
         / "base_excited_cantilever_energy_summary.csv"
     )
+    refinement_path = (
+        arguments.output_directory
+        / "base_excited_cantilever_refinement_comparison.csv"
+    )
     write_csv(comparison_path, comparisons)
     write_csv(summary_path, summaries)
     write_csv(energy_summary_path, energy_summaries)
+    write_csv(
+        refinement_path,
+        refinement_comparisons(
+            arguments.results_directory, experimental_rows
+        ),
+    )
     print(f"Wrote {comparison_path}")
     print(f"Wrote {summary_path}")
     print(f"Wrote {energy_summary_path}")
+    print(f"Wrote {refinement_path}")
 
 
 if __name__ == "__main__":

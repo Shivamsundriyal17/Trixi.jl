@@ -74,6 +74,8 @@ analysis script accepts only the explicitly documented frequency and
 periodicity ranges. The two down-sweeps contain the strict lower stable
 branches. `farokhi_02g_k3n4_refined_check.csv` is the independent
 degree-three/four-element lower-branch check.
+`farokhi_05g_k3n4_refined_up_sweep.csv` is the seven-point refined upper path
+through the extreme 0.5g response.
 
 `base_excited_cantilever_branch_comparison.csv` contains every accepted
 numerical/experimental pair. `base_excited_cantilever_branch_summary.csv`
@@ -82,6 +84,9 @@ contains the branchwise errors, and
 decomposition at each branch's maximum accepted numerical response. The raw
 experimental markers are in
 `farokhi_2022_experimental_frequency_response.csv`.
+`base_excited_cantilever_refinement_comparison.csv` matches every refined
+point to its baseline and experimental marker and records both response
+changes and signed work fractions.
 
 Regenerate the four baseline raw campaigns with:
 

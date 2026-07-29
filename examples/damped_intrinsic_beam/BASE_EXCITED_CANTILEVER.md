@@ -73,6 +73,10 @@ archives make local fold refinement possible without retracing the entire
 branch. Set `CANTILEVER_SWEEP_RESUME=false` to start a campaign from its
 initial equilibrium instead of its checkpoint.
 
+The CSV `accepted_steps` and `rejected_steps` fields describe the final solve
+block from which the response and ledger are measured; they are not cumulative
+work counters over all settling blocks.
+
 The baseline uses two elements of degree four. This is the least expensive
 tested discretization that agrees with four degree-three elements at the
 checked response points. An isolated fixed-frequency start in the coexistence
@@ -164,6 +168,14 @@ This brackets a discrepancy in the fold region, but it does not locate the
 numerical saddle-node: smaller steps restarted from the archived 1.04118
 state are required before making a bifurcation claim.
 
+The complete degree-three/four-element upper-branch check covers seven
+frequencies from 0.97742 to 1.04118. At the final point, refinement changes
+the transverse response from 0.85383 to 0.85706 (0.38%), compared with the
+experimental 0.85534. It changes the longitudinal minimum from -0.99826 to
+-1.03726 (3.76%), compared with the experimental -0.96978. Thus the extreme
+transverse plateau is spatially robust, but the shortening and rotation are
+more sensitive and the refined shortening is about 7.0% too large.
+
 ## Cycle energy ledger
 
 For the final measured cycle, the code checks
@@ -176,24 +188,29 @@ For the final measured cycle, the code checks
 Here \(E\) includes intrinsic and gravitational potential energy,
 \(D_{\mathrm{KV}}\) is physical Kelvin--Voigt dissipation, and
 \(D_{\mathrm{jump}}\) is upwind interface dissipation. Since the imposed
-root velocity enters through an SAT boundary state, the interpretable net
-boundary loss is \(D_L+D_R-W_{\mathrm{SAT}}\); reporting \(D_L\) or
+root velocity enters through an SAT boundary state, the interpretable signed
+boundary contribution is \(D_L+D_R-W_{\mathrm{SAT}}\); positive values are
+dissipative and negative values inject energy. Reporting \(D_L\) or
 \(W_{\mathrm{SAT}}\) alone exposes a large but artificial cancellation.
 
 At the maximum accepted upper response of each campaign, the percentages of
 physical root work are:
 
-| acceleration | \(\Delta E\) | Kelvin--Voigt | interface | net boundary |
-|:---:|---:|---:|---:|---:|
-| 0.2g | 0.58% | 94.90% | 1.89% | 2.63% |
-| 0.5g | 0.013% | 77.76% | 8.17% | 14.05% |
+| acceleration/discretization | \(\Delta E\) | Kelvin--Voigt | interface | net boundary |
+|:---|---:|---:|---:|---:|
+| 0.2g, degree 4 / 2 cells | 0.58% | 94.90% | 1.89% | 2.63% |
+| 0.5g, degree 4 / 2 cells | 0.013% | 77.76% | 8.17% | 14.05% |
+| 0.5g, degree 3 / 4 cells | 0.024% | 91.74% | 3.91% | 4.32% |
 
 The compact residual divided by physical root work is below
-\(1.6\times10^{-6}\). Closure is therefore excellent, but closure alone does
-not make the numerical losses physical. The 0.5g extreme response assigns
-about 22% of the input work to interface and net boundary dissipation. That
-fraction must be checked on the degree-three/four-element upper branch before
-the energy decomposition is used as a paper result.
+\(1.6\times10^{-6}\) for the baseline peak rows and
+\(4.8\times10^{-6}\) for the refined 0.5g peak. Closure is therefore
+excellent, but closure alone does not make the numerical losses physical.
+At the 0.5g extreme response, refinement reduces interface plus net boundary
+loss from 22.22% to 8.24% while changing transverse amplitude by only 0.38%.
+The baseline work partition is therefore not grid-independent. The refined
+ledger is a much better diagnostic, but a precise physical/numerical
+dissipation split should not be claimed without another refinement level.
 
 The old selected-point file is retained only as a legacy regression record.
 Its rows used shorter settling runs, and its original 0.2g longitudinal
@@ -210,5 +227,8 @@ Archived files:
 - `reference/base_excited_cantilever_branch_comparison.csv`;
 - `reference/base_excited_cantilever_branch_summary.csv`;
 - `reference/base_excited_cantilever_energy_summary.csv`;
+- `reference/base_excited_cantilever_refinement_comparison.csv`;
+- `reference/farokhi_02g_k3n4_refined_check.csv`;
+- `reference/farokhi_05g_k3n4_refined_up_sweep.csv`;
 - `reference/base_excited_cantilever_validation.csv` (legacy);
 - `reference/base_excited_cantilever_numerical_checks.csv` (legacy).
