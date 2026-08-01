@@ -2,7 +2,11 @@ using Dates: UTC, now
 using Printf: @printf
 using Trixi
 
-const ELIXIR = joinpath(@__DIR__, "elixir_mms_physical.jl")
+const ELIXIR_OVERRIDE = get(ENV, "MMS_ELIXIR", "")
+const ELIXIR = isempty(ELIXIR_OVERRIDE) ?
+               joinpath(@__DIR__, "elixir_mms_rich_physical.jl") :
+               abspath(ELIXIR_OVERRIDE)
+const IS_RICH_MMS = basename(ELIXIR) == "elixir_mms_rich_physical.jl"
 const REPOSITORY_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 
 function parse_list(name, default, conversion)
@@ -75,6 +79,11 @@ open(output_file, "w") do io
     println(io, "# trixi_commit=", commit)
     println(io, "# trixi_worktree=", worktree_state)
     println(io, "# julia_threads=", Threads.nthreads())
+    println(io, "# elixir=", ELIXIR)
+    IS_RICH_MMS && println(io, "# rich_mms_lambda=",
+                           get(ENV, "RICH_MMS_LAMBDA", "2.0"))
+    IS_RICH_MMS && println(io, "# rich_mms_profile=",
+                           get(ENV, "RICH_MMS_PROFILE", "exp1"))
     println(io, "# polydeg=", polydeg)
     println(io, "# refinement_level=", refinement_level)
     println(io, "# ncells=", ncells)

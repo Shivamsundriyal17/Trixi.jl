@@ -35,8 +35,10 @@ julia --project=examples/damped_intrinsic_beam \
   examples/damped_intrinsic_beam/results/mms_convergence.csv
 ```
 
-The committed full-run data and finest-grid EOC summary are in
-[`reference/`](reference/).
+The presently committed [`reference/`](reference/) directory retains the
+homogeneous sine-MMS baseline. The replacement exponential campaign is staged
+under `results/mms_rich_exp1_*.csv` pending approval; reference promotion is a
+separate release step.
 
 The defaults are polynomial degrees `1,2,3`, cell counts
 `4,8,16,32,64,128`, characteristic upwinding (`sigma=1`), both alternating
@@ -44,8 +46,11 @@ LDG and BR1 auxiliary traces, final time `T=1`, and absolute/relative ROCK4
 tolerances `1e-12`. The example environment pins
 `OrdinaryDiffEqStabilizedRK` to `1.4.0`. The CSV preamble records the Julia
 version, Trixi commit and worktree state, command, and numerical settings.
-The campaign also writes a sibling `_componentwise.csv` containing `L2` and
-`Linf` errors and EOCs for all twelve primary fields.
+The campaign also writes sibling `_componentwise.csv` and
+`_viscous_componentwise.csv` files. The first contains `L2` and `Linf` errors
+and EOCs for all twelve primary fields. The second reconstructs all six
+Kelvin--Voigt resultant components from Trixi's actual discrete auxiliary
+gradient and records the same norms and rates.
 
 For a smaller smoke run, override comma-separated settings through environment
 variables:
@@ -57,8 +62,38 @@ MMS_POLYDEGS=2 MMS_REFINEMENT_LEVELS=2,3 MMS_AUXILIARY_FLUXES=alternating \
 ```
 
 Available variables are `MMS_POLYDEGS`, `MMS_REFINEMENT_LEVELS`,
-`MMS_SIGMAS`, `MMS_AUXILIARY_FLUXES`, and `MMS_TIME_TOL`. Refinement level
-`r` means `2^r` uniform cells.
+`MMS_SIGMAS`, `MMS_AUXILIARY_FLUXES`, `MMS_TIME_TOL`, and `MMS_ELIXIR`.
+Refinement level `r` means `2^r` uniform cells.
+
+The paper-facing physical MMS activates all twelve state components, all six
+Kelvin--Voigt resultant components, both lower compatibility terms, and exact
+inhomogeneous split boundary data. Its default traveling profile is
+`exp(x + t)`. Run a compact alternating-LDG audit with:
+
+```bash
+JULIA_NUM_THREADS=1 \
+RICH_MMS_LAMBDA=2 \
+MMS_POLYDEGS=1,2,3 MMS_REFINEMENT_LEVELS=2,3,4,5 \
+MMS_AUXILIARY_FLUXES=alternating \
+julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/run_mms_convergence.jl \
+  examples/damped_intrinsic_beam/results/mms_rich_convergence.csv
+```
+
+Set `RICH_MMS_LAMBDA` to override the default value `2.0`; the independent
+cancellation guard uses `1.5`. Set `RICH_MMS_PROFILE=quartic` to reproduce the
+first rich-profile audit. The older homogeneous sine MMS remains available as
+an independent regression with
+`MMS_ELIXIR=examples/damped_intrinsic_beam/elixir_mms_physical.jl`.
+
+For the full campaign, use refinement levels `2,3,4,5,6,7` and both
+`alternating,br1` traces. With the default exponential profile, the alternating
+`k=3` primary-state EOCs on the finest pair are approximately `3.92,3.96` for
+`u1,u2`. A `1e-13` repeat at `N=64,128` gives resolved EOCs
+`3.922,3.960,3.900` for `u1,u2,r_tau`. The quartic profile instead reaches the
+temporal floor at the finest cubic mesh and is retained only as a supplementary
+structural regression.
 
 Run the targeted finest-grid temporal-error check with:
 
