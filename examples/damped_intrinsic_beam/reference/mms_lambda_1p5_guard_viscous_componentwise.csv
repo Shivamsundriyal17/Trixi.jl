@@ -1,0 +1,35 @@
+# Componentwise numerical Kelvin-Voigt resultant errors
+# r_tau is reconstructed from Trixi's discrete auxiliary gradient
+# generated_utc=2026-08-01T16:28:13
+# julia_version=1.11.6
+# trixi_commit=b5b1747b7a9f0a0fc34452d4222d35b0a26ac943
+# trixi_worktree=clean
+# julia_threads=1
+# command=examples/damped_intrinsic_beam/results/mms_rich_exp1_clean_lambda_1p5_guard.csv examples/damped_intrinsic_beam/results/mms_rich_exp1_clean_lambda_1p5_guard_componentwise.csv examples/damped_intrinsic_beam/results/mms_rich_exp1_clean_lambda_1p5_guard_viscous_componentwise.csv
+# elixir=/home/sundriyal/Projects/Trixi-damped-clean/examples/damped_intrinsic_beam/elixir_mms_rich_physical.jl
+# rich_mms_lambda=1.5
+# rich_mms_profile=exp1
+# polydegs=2
+# refinement_levels=4,5,6
+# sigmas=1.0
+# auxiliary_fluxes=alternating
+# rock4_abstol_reltol=1.0e-12
+polydeg,refinement_level,ncells,h,hyperbolic_flux,auxiliary_flux,component_index,component,l2_error,l2_eoc,linf_error,linf_eoc
+2,4,16,6.2500000000000000e-02,upwind,alternating,1,r_tau_f1,2.1812495489088575e-05,NaN,5.1738458400674148e-05,NaN
+2,4,16,6.2500000000000000e-02,upwind,alternating,2,r_tau_f2,3.7001458349272165e-05,NaN,1.2702352777538284e-04,NaN
+2,4,16,6.2500000000000000e-02,upwind,alternating,3,r_tau_f3,2.0319572762728447e-05,NaN,9.1054016971320317e-05,NaN
+2,4,16,6.2500000000000000e-02,upwind,alternating,4,r_tau_m1,5.4855299069844557e-06,NaN,2.4652669466593280e-05,NaN
+2,4,16,6.2500000000000000e-02,upwind,alternating,5,r_tau_m2,1.6772433338207217e-05,NaN,5.8701939107244638e-05,NaN
+2,4,16,6.2500000000000000e-02,upwind,alternating,6,r_tau_m3,3.6455619723805012e-06,NaN,2.7495001250335549e-05,NaN
+2,5,32,3.1250000000000000e-02,upwind,alternating,1,r_tau_f1,6.0450467533353313e-06,1.85132943,1.9895347105614025e-05,1.37880600
+2,5,32,3.1250000000000000e-02,upwind,alternating,2,r_tau_f2,5.3110119525967201e-06,2.80052345,2.1311429499987211e-05,2.57539647
+2,5,32,3.1250000000000000e-02,upwind,alternating,3,r_tau_f3,2.7698815629007007e-06,2.87497387,1.2516861327943607e-05,2.86284982
+2,5,32,3.1250000000000000e-02,upwind,alternating,4,r_tau_m1,7.9318720664553593e-07,2.78989768,2.0213164150378882e-06,3.60837679
+2,5,32,3.1250000000000000e-02,upwind,alternating,5,r_tau_m2,2.4009961771545831e-06,2.80438700,1.0343144214539080e-05,2.50473334
+2,5,32,3.1250000000000000e-02,upwind,alternating,6,r_tau_m3,5.1334536609092279e-07,2.82813956,2.2145251674654531e-06,3.63410005
+2,6,64,1.5625000000000000e-02,upwind,alternating,1,r_tau_f1,1.0576815710444557e-06,2.51484815,4.3138290508615285e-06,2.20539016
+2,6,64,1.5625000000000000e-02,upwind,alternating,2,r_tau_f2,7.2376275379034818e-07,2.87539801,3.2028344639778439e-06,2.73420623
+2,6,64,1.5625000000000000e-02,upwind,alternating,3,r_tau_f3,4.4325131141750052e-07,2.64362748,1.9343513960601300e-06,2.69395104
+2,6,64,1.5625000000000000e-02,upwind,alternating,4,r_tau_m1,1.8397286730236495e-07,2.10816840,7.3134361333604403e-07,1.46667387
+2,6,64,1.5625000000000000e-02,upwind,alternating,5,r_tau_m2,2.8659604827947010e-07,3.06654248,1.3636936613270478e-06,2.92308332
+2,6,64,1.5625000000000000e-02,upwind,alternating,6,r_tau_m3,1.3006867027616079e-07,1.98065626,5.0697192796600454e-07,2.12701962

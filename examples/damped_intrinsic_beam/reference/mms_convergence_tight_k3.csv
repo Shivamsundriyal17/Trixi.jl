@@ -1,0 +1,23 @@
+# Physical, constitutively consistent Kelvin-Voigt MMS
+# generated_utc=2026-08-01T16:16:40.447
+# julia_version=1.11.6
+# trixi_commit=b5b1747b7a9f0a0fc34452d4222d35b0a26ac943
+# trixi_worktree=clean
+# julia_threads=1
+# command=examples/damped_intrinsic_beam/results/mms_rich_exp1_clean_tight_k3.csv examples/damped_intrinsic_beam/results/mms_rich_exp1_clean_tight_k3_componentwise.csv examples/damped_intrinsic_beam/results/mms_rich_exp1_clean_tight_k3_viscous_componentwise.csv
+# elixir=/home/sundriyal/Projects/Trixi-damped-clean/examples/damped_intrinsic_beam/elixir_mms_rich_physical.jl
+# rich_mms_lambda=2.0
+# rich_mms_profile=exp1
+# polydegs=3
+# refinement_levels=6,7
+# sigmas=1.0
+# auxiliary_fluxes=alternating
+# rock4_abstol_reltol=1.0e-13
+# error=arithmetic mean of six componentwise L2 errors at T=1
+polydeg,refinement_level,ncells,h,hyperbolic_flux,auxiliary_flux,block,l2_error,eoc
+3,6,64,1.5625000000000000e-02,upwind,alternating,u1,3.1282395079137675e-10,NaN
+3,6,64,1.5625000000000000e-02,upwind,alternating,u2,5.7430695151411277e-10,NaN
+3,6,64,1.5625000000000000e-02,upwind,alternating,r_tau,3.3497027313386541e-10,NaN
+3,7,128,7.8125000000000000e-03,upwind,alternating,u1,2.0643355165504753e-11,3.92160160
+3,7,128,7.8125000000000000e-03,upwind,alternating,u2,3.6895798146071547e-11,3.96029359
+3,7,128,7.8125000000000000e-03,upwind,alternating,r_tau,2.2443609328438742e-11,3.89965646
