@@ -24,7 +24,7 @@ Run the physical manufactured-solution case:
 
 ```bash
 julia --project=examples/damped_intrinsic_beam \
-  examples/damped_intrinsic_beam/elixir_mms_physical.jl
+  examples/damped_intrinsic_beam/elixir_mms_rich_physical.jl
 ```
 
 Run the complete convergence campaign:
@@ -35,10 +35,11 @@ julia --project=examples/damped_intrinsic_beam \
   examples/damped_intrinsic_beam/results/mms_convergence.csv
 ```
 
-The presently committed [`reference/`](reference/) directory retains the
-homogeneous sine-MMS baseline. The replacement exponential campaign is staged
-under `results/mms_rich_exp1_*.csv` pending approval; reference promotion is a
-separate release step.
+The committed [`reference/`](reference/) directory contains the compatible
+exponential campaign generated from clean implementation commit `b5b1747b`
+and promoted in reference-data commit `483e594b`. It includes the standard
+campaign, tight cubic audit, reconstructed-resultant errors, and the
+`lambda=1.5` coefficient guard.
 
 The defaults are polynomial degrees `1,2,3`, cell counts
 `4,8,16,32,64,128`, characteristic upwinding (`sigma=1`), both alternating
