@@ -126,3 +126,55 @@ they cannot supply the missing provenance required for resume. Rotating caches
 from older code must be regenerated before reuse. Full-duration rotating and
 experimental cantilever sweeps were not rerun. The existing cantilever Jacobian
 sparsity discovery remains a finite-difference heuristic.
+
+## Extended draft-PR validation
+
+The reusable longer-case runner is:
+
+```bash
+JULIA_NUM_THREADS=1 julia --compiled-modules=no --check-bounds=yes \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/run_extended_validation.jl
+```
+
+It runs transient and steady-initialized rotating cases to T=2 with degree 3,
+eight cells, and online energy diagnostics, followed by a driven cantilever at
+0.2g RMS, 9.2 Hz, unit gravity, degree 4 and two cells. The cantilever uses eight
+ramp cycles, ten settling cycles and two measurement cycles, sampled 96 times per
+cycle. These runs extend the smoke coverage but are not full paper campaigns.
+The rotating transient's distance from the steady solution is a physical
+transient diagnostic, not a discretization-error estimate. No refinement EOC is
+computed for these fixed-mesh cases, and no analytic driven-cantilever L2/Linf
+reference is available. Timings include case compilation and exclude initial
+package loading. Raw diagnostics are written to `results/extended_validation.txt`.
+
+On 2026-09-21, draft PR #1 had zero reported checks and zero check runs for its
+head commit. The upstream Actions API listed zero registered workflows, despite
+workflow files being present in the checkout. Repository Actions administration
+is unavailable to the current account (403), so upstream CI is unresolved and
+the PR remains in draft.
+
+The corrected runner completed with exit code 0 and all seven assertions passed.
+Its first invocation exposed a world-age error in the new reporting script after
+the cantilever solve had completed; calling the dynamically loaded ledger through
+`Base.invokelatest` fixed the runner. No solver changes were needed.
+
+| Case | Runtime (s) | Accepted steps | Energy-balance diagnostic |
+|---|---:|---:|---:|
+| Rotating transient, T=2 | 78.201440282 | 102401 | maximum instantaneous relative residual 2.1738369915845454e-15 |
+| Rotating steady initial state, T=2 | 46.675549461 | 102401 | maximum instantaneous relative residual 7.904870721486373e-16 |
+| Driven cantilever, 20 cycles | 88.244330976 | 9593 | integrated relative residual 4.969158264625933e-8 |
+
+For the steady-initialized rotating case, force L2/Linf errors are
+5.645731035622189e-6 / 6.719811009858745e-6 and transverse velocity errors are
+3.9479536628971314e-8 / 8.250257010899986e-8. Relative energy error is
+5.290332135240981e-12. For the transient case, force L2/Linf distances from the
+steady reference are 98.10481663147682 / 61.897534265632046 and transverse velocity
+distances are 5.952528082281257 / 5.573866618642297; this transient is not settled.
+
+The driven cantilever returned `Success`, with 734 rejected steps, transverse
+peak 0.5200007886832135, longitudinal minimum -0.17594880316858497 and rotation
+peak 0.774562603233356 in the example's nondimensional variables. Its cycle
+mismatch is 0.0350674516831595: this validates finite driven evolution and energy
+balance, **not a converged periodic response**. Longer settling and the broader
+upstream test matrix remain necessary before marking the PR ready.
