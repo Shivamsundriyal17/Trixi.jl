@@ -4,6 +4,8 @@ using LinearAlgebra: Diagonal
 using Test
 using Trixi
 
+const EXAMPLES_DIR = examples_dir()
+
 include("test_trixi.jl")
 include(joinpath(examples_dir(), "damped_intrinsic_beam", "visualization",
                  "beam_geometry.jl"))
@@ -137,5 +139,7 @@ end
                         tspan=(0.0, 1.0e-4),
                         save_times=[0.0, 1.0e-4])
 end
+
+include("test_damped_intrinsic_beam_regressions.jl")
 
 end # module

@@ -1,6 +1,12 @@
 using LinearAlgebra: norm
 using Serialization: serialize
 
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+run_provenance = beam_run_provenance()
+
 Base.include(@__MODULE__, joinpath(@__DIR__, "elixir_rotating_beam.jl"))
 
 output_file = haskey(ENV, "ROTATING_OUTPUT_FILE") ?
@@ -63,7 +69,7 @@ function instantaneous_ledger(state, t)
                         length(quadrature_weights),
                         length(volume_jacobians))
     energy_rate = beam_quadrature_sum() do i, element
-        state_node = SVector{12}(state_array[:, i, element])
+        state_node = beam_node(state_array, i, element)
         rhs_node = SVector{12}(rhs_array[:, i, element])
         dot(equations_hyperbolic.capacity_matrix * state_node,
             rhs_node)
@@ -140,7 +146,13 @@ states = [Array(reshape(state, state_shape)) for state in sol.u]
 steady_states = [collect(steady_rotating_solution(x))
                  for x in node_coordinates_flat]
 
-data = (times = collect(sol.t),
+data = (run_configuration = (; case_name, damping_multiplier,
+                             steady_initial_condition, polydeg,
+                             ncells = 2^initial_refinement_level, cfl,
+                             final_time = last(tspan), save_count = length(save_times),
+                             record_online_ledger),
+        provenance = run_provenance, completed = true,
+        times = collect(sol.t),
         node_coordinates = node_coordinates_flat,
         states,
         flexibility_matrix = Matrix(flexibility_matrix),

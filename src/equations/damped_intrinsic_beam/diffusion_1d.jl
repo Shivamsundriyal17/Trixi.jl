@@ -25,7 +25,7 @@ function varnames(variable_mapping,
 end
 
 @inline function _intrinsic_beam_block(vector, first_index)
-    return SVector{6}(ntuple(index -> vector[first_index + index - 1], 6))
+    return SVector{6}(ntuple(index -> vector[first_index + index - 1], Val(6)))
 end
 
 """
@@ -55,7 +55,7 @@ end
     upper_flux = hyperbolic.mass_inverse * damping_resultant
     ScalarT = eltype(upper_flux)
     return SVector{12}(ntuple(index -> index <= 6 ? upper_flux[index] :
-                                       zero(ScalarT), 12))
+                                       zero(ScalarT), Val(12)))
 end
 
 """
@@ -69,22 +69,25 @@ Evaluate the capacity-scaled nonlinear and external source at one point.
     hyperbolic = equations.equations_hyperbolic
     u1 = _intrinsic_beam_block(u, 1)
     u2 = _intrinsic_beam_block(u, 7)
-    damping_resultant = intrinsic_beam_damping_resultant(u, gradient, equations)
-
+    u1_x = _intrinsic_beam_block(gradient, 1)
     elastic_strain = hyperbolic.flexibility_matrix * u2
+    l1 = intrinsic_beam_l1(u1)
+    geometry_term = transpose(hyperbolic.geometry_matrix) * u1
+    compatibility_term = transpose(l1) * elastic_strain
+    damping_resultant = hyperbolic.damping_operator *
+                        (u1_x - geometry_term + compatibility_term)
     external_force = hyperbolic.external_force(x, t, hyperbolic)
     length(external_force) == 6 ||
         throw(ArgumentError("external_force must return exactly six entries"))
     external_force_static = SVector{6}(external_force)
 
     upper_source = hyperbolic.geometry_matrix * u2 -
-                   intrinsic_beam_l1(u1) * (hyperbolic.mass_matrix * u1) -
+                   l1 * (hyperbolic.mass_matrix * u1) -
                    intrinsic_beam_l2(u2) * elastic_strain -
                    intrinsic_beam_l2(damping_resultant) * elastic_strain +
                    hyperbolic.geometry_matrix * damping_resultant +
                    external_force_static
-    lower_source = -transpose(hyperbolic.geometry_matrix) * u1 +
-                   transpose(intrinsic_beam_l1(u1)) * elastic_strain
+    lower_source = -geometry_term + compatibility_term
 
     scaled_upper = hyperbolic.mass_inverse * upper_source
     scaled_lower = hyperbolic.flexibility_inverse * lower_source
@@ -145,6 +148,6 @@ end
         upper_flux = hyperbolic.mass_inverse * damping_resultant
         ScalarT = eltype(upper_flux)
         return SVector{12}(ntuple(index -> index <= 6 ? upper_flux[index] :
-                                           zero(ScalarT), 12))
+                                           zero(ScalarT), Val(12)))
     end
 end

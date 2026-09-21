@@ -85,12 +85,12 @@ function manufactured_force_damped_intrinsic_beam(x, t,
     relative_tolerance = isnothing(rtol) ? 100 * eps(ScalarT) : rtol
     scale = max(norm(source, Inf), one(ScalarT))
     tolerance = absolute_tolerance + relative_tolerance * scale
-    lower_norm = norm(SVector{6}(source[7:12]), Inf)
+    lower_norm = norm(_intrinsic_beam_block(source, 7), Inf)
 
     lower_norm <= tolerance ||
         throw(ArgumentError("manufactured fields require a nonzero lower-block " *
                             "source (infinity norm $lower_norm); they are not " *
                             "a physical Kelvin-Voigt manufactured solution"))
 
-    return SVector{6}(source[1:6])
+    return _intrinsic_beam_block(source, 1)
 end

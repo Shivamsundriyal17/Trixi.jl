@@ -1,3 +1,8 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using Dates: UTC, now
 using Printf: Format, @printf, format
 using Serialization: deserialize
@@ -55,9 +60,17 @@ function repository_metadata()
     return commit, state
 end
 
+provenance = beam_run_provenance()
 results = []
 for case in cases
     output_file = joinpath(output_directory, case.name * ".jls")
+    configuration = (; case_name = case.name, damping_multiplier = case.damping,
+                     steady_initial_condition = case.steady,
+                     polydeg = parse(Int, get(ENV, "ROTATING_POLYDEG", "3")),
+                     ncells = 2^parse(Int, get(ENV, "ROTATING_REFINEMENT_LEVEL", "3")),
+                     cfl = parse(Float64, get(ENV, "ROTATING_CFL", "0.01")),
+                     final_time = case.final_time, save_count,
+                     record_online_ledger = case.record_ledger)
     if reuse_results && isfile(output_file)
         println("reusing ", output_file)
     else
@@ -74,7 +87,9 @@ for case in cases
             Base.include(case_module, EXPORTER)
         end
     end
-    push!(results, deserialize(output_file))
+    push!(results,
+          validate_rotating_result(deserialize(output_file),
+                                   configuration, provenance))
     GC.gc()
 end
 

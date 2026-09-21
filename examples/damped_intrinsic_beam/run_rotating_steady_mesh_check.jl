@@ -1,3 +1,8 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using Dates: UTC, now
 using Printf: Format, @printf, format
 using Serialization: deserialize
@@ -44,10 +49,16 @@ function repository_metadata()
     return commit, state
 end
 
+provenance = beam_run_provenance()
 results = []
 for refinement_level in refinement_levels
     ncells = 2^refinement_level
     output_file = joinpath(output_directory, "steady_N$(ncells).jls")
+    configuration = (; case_name = "steady_N$(ncells)", damping_multiplier = 1.0,
+                     steady_initial_condition = true,
+                     polydeg = parse(Int, get(ENV, "ROTATING_POLYDEG", "3")), ncells,
+                     cfl = parse(Float64, get(ENV, "ROTATING_CFL", "0.01")),
+                     final_time, save_count = 2, record_online_ledger = false)
     if reuse_results && isfile(output_file)
         @printf("reusing rotating steady mesh check N=%d\n", ncells)
     else
@@ -65,7 +76,9 @@ for refinement_level in refinement_levels
             Base.include(case_module, EXPORTER)
         end
     end
-    push!(results, deserialize(output_file))
+    push!(results,
+          validate_rotating_result(deserialize(output_file),
+                                   configuration, provenance))
     GC.gc()
 end
 

@@ -1,3 +1,8 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using LinearAlgebra: Diagonal
 using OrdinaryDiffEqLowStorageRK
 using Trixi
@@ -46,18 +51,16 @@ tspan = (0.0, 10.0)
 ode = semidiscretize(semi, tspan)
 
 cfl = 0.01
-stepsize_callback = StepsizeCallback(cfl = cfl)
 save_times = sort!(unique!(vcat(collect(range(0.0, 0.1; length = 101)),
                                 collect(range(0.1, 1.0; length = 91)),
                                 collect(range(1.0, last(tspan); length = 181)))))
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
-            dt = 1.0,
+            dt = beam_explicit_timestep(ode, cfl),
             adaptive = false,
-            callback = stepsize_callback,
             saveat = save_times,
             ode_default_options()...)
 
-@assert all(isfinite, sol.u[end])
+require_complete_solution(sol, last(tspan))
 energy_history = [Trixi.integrate(entropy, state, semi; normalize = false)
                   for state in sol.u]
 maximum_axial_resultant = [maximum(abs, @view(state[7:12:length(state)]))

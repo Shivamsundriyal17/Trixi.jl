@@ -62,7 +62,8 @@ examples/damped_intrinsic_beam/run_base_excited_cantilever_campaign.sh \
 The four baseline campaign names are `02g_upper`, `02g_lower`, `05g_upper`,
 and `05g_lower`. The lower branches are deliberately swept from high to low
 frequency. Two targeted refinement checks are named `02g_refined_lower` and
-`05g_refined_upper`. The wrapper contains the exact frequency paths, cycle
+`05g_refined_upper`. A controlled gravity sensitivity run is named
+`05g_zero_gravity`. The wrapper contains the exact frequency paths, cycle
 budgets, tolerances, discretizations, and output names used for the archived
 results.
 
@@ -91,10 +92,56 @@ Julia 1.10, but this benchmark has not yet been rerun there.
 Important controls include:
 
 - `CANTILEVER_SWEEP_NORMALIZED_FREQUENCIES`;
+- `CANTILEVER_GRAVITY_MULTIPLIER`;
 - `CANTILEVER_SWEEP_RELTOL` and `CANTILEVER_SWEEP_ABSTOL`;
 - `CANTILEVER_SWEEP_PERIODICITY_TOLERANCE`;
 - `CANTILEVER_POLYDEG` and `CANTILEVER_REFINEMENT_LEVEL`;
 - `CANTILEVER_SWEEP_RESUME` and `CANTILEVER_SWEEP_ARCHIVE_STATES`.
+
+## Gravity implementation audit
+
+Gravity is not applied as constant material-frame components. At each residual
+evaluation, the implementation reconstructs the current cross-section angle
+from the intrinsic curvature and rotates the fixed spatial dead load into the
+material frame. Two targeted checks exercise this path.
+
+First run the named refined upper-branch campaign, then release its final
+large-deformation state with the root fixed and compare gravitational power
+with the directional derivative of the reconstructed gravitational potential:
+
+```bash
+examples/damped_intrinsic_beam/run_base_excited_cantilever_campaign.sh \
+  05g_refined_upper
+julia --compiled-modules=no \
+  --project=examples/damped_intrinsic_beam \
+  examples/damped_intrinsic_beam/audit_base_excited_cantilever_gravity.jl
+```
+
+For the recorded degree-three/four-element state, the largest relative
+work--potential residual over the released transient is
+\(6.35\times10^{-5}\). This is a semidiscrete compatibility audit rather than
+an ODE finite-difference check: the potential is differentiated analytically
+along the computed semidiscrete right-hand side.
+
+The second check repeats the high-frequency part of the 0.5g up-sweep with
+gravity disabled, preserving the discretization, continuation protocol, and
+normalized frequency path:
+
+```bash
+examples/damped_intrinsic_beam/run_base_excited_cantilever_campaign.sh \
+  05g_zero_gravity
+python3 \
+  examples/damped_intrinsic_beam/analyze_base_excited_cantilever_gravity.py
+```
+
+Gravity lowers the discrete linear frequency from 9.383789 Hz to 9.124964 Hz
+(2.758%). Relative to each configuration's own first frequency, the last
+accepted upper-branch point moves from \(f/f_1=1.030893\) without gravity to
+\(1.041175\) with gravity. In absolute frequency it instead moves from
+9.673681 Hz to 9.500685 Hz because the linear-frequency reduction dominates.
+The comparison therefore supports both effects reported for this benchmark:
+gravity lowers the resonance scale while modestly increasing the normalized
+hardening range.
 
 After all four baseline campaigns are present, reproduce the comparison tables
 with:
@@ -269,3 +316,13 @@ Archived files:
 - `reference/farokhi_05g_k3n4_refined_up_sweep.csv`;
 - `reference/base_excited_cantilever_validation.csv` (legacy);
 - `reference/base_excited_cantilever_numerical_checks.csv` (legacy).
+
+### Checkpoint compatibility after the pre-push cleanup
+
+New sweeps write format-5 checkpoints with source/environment identity and the
+physical, integration, sampling, and continuation settings. Resume rejects a
+changed configuration; legacy checkpoints remain available for cycle replay.
+The cycle exporter restores saved gravity, including zero gravity, and restores
+format-5 integration settings. The unit-gravity work audit rejects a checkpoint
+from a different gravity configuration. Direct sweep output now defaults to
+`results/`, so running an exploratory sweep does not replace archived references.

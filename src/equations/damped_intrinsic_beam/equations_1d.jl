@@ -10,20 +10,21 @@ function _intrinsic_beam_matrix(matrix::AbstractMatrix{<:Real}, name;
 
     ScalarT = float(eltype(matrix))
     dense_matrix = Matrix{ScalarT}(matrix)
-    scale = max(LinearAlgebra.opnorm(dense_matrix, Inf), one(ScalarT))
+    all(isfinite, dense_matrix) || throw(ArgumentError("$name must contain finite entries"))
+    scale = LinearAlgebra.opnorm(dense_matrix, Inf)
     tolerance = 100 * eps(ScalarT) * scale
     isapprox(dense_matrix, transpose(dense_matrix);
              atol = tolerance, rtol = 100 * eps(ScalarT)) ||
         throw(ArgumentError("$name must be symmetric"))
 
-    symmetric_matrix = LinearAlgebra.Symmetric(0.5 *
+    symmetric_matrix = LinearAlgebra.Symmetric(ScalarT(0.5) *
                                                (dense_matrix +
                                                 transpose(dense_matrix)))
-    eigenvalues = LinearAlgebra.eigvals(symmetric_matrix)
     if positive_definite
-        minimum(eigenvalues) > tolerance ||
+        LinearAlgebra.isposdef(symmetric_matrix) ||
             throw(ArgumentError("$name must be positive definite"))
     else
+        eigenvalues = LinearAlgebra.eigvals(symmetric_matrix)
         minimum(eigenvalues) >= -tolerance ||
             throw(ArgumentError("$name must be positive semidefinite"))
     end
@@ -91,10 +92,18 @@ function DampedIntrinsicBeamEquations1D(;
                                         mass_matrix::AbstractMatrix{<:Real},
                                         flexibility_matrix::AbstractMatrix{<:Real},
                                         damping_matrix::AbstractMatrix{<:Real},
-                                        initial_curvature = zeros(3),
+                                        initial_curvature = nothing,
                                         external_force = _zero_intrinsic_beam_data)
+    CoefficientT = promote_type(float(eltype(mass_matrix)),
+                                float(eltype(flexibility_matrix)),
+                                float(eltype(damping_matrix)))
+    if isnothing(initial_curvature)
+        initial_curvature = zero(SVector{3, CoefficientT})
+    end
     length(initial_curvature) == 3 ||
         throw(ArgumentError("initial_curvature must contain exactly three entries"))
+    all(isfinite, initial_curvature) ||
+        throw(ArgumentError("initial_curvature must contain finite entries"))
 
     RealT = promote_type(float(eltype(mass_matrix)),
                          float(eltype(flexibility_matrix)),
@@ -113,7 +122,9 @@ function DampedIntrinsicBeamEquations1D(;
     mass_inverse = inv(mass)
     flexibility_inverse = inv(flexibility)
     damping_operator_raw = damping * flexibility_inverse
-    scale = max(LinearAlgebra.opnorm(damping_operator_raw, Inf), one(RealT))
+    all(isfinite, damping_operator_raw) ||
+        throw(ArgumentError("the compatible damping operator must be finite"))
+    scale = LinearAlgebra.opnorm(damping_operator_raw, Inf)
     tolerance = 500 * eps(RealT) * scale
     isapprox(damping_operator_raw, transpose(damping_operator_raw);
              atol = tolerance, rtol = 500 * eps(RealT)) ||
@@ -272,16 +283,16 @@ end
     if isodd(direction)
         left_velocity = _intrinsic_beam_boundary_value(boundary_condition.left_velocity,
                                                        x, t, equations)
-        difference = SVector{6}(u_inner[1:6]) - left_velocity
-        outer_resultant = SVector{6}(u_inner[7:12]) +
+        difference = _intrinsic_beam_block(u_inner, 1) - left_velocity
+        outer_resultant = _intrinsic_beam_block(u_inner, 7) +
                           equations.left_impedance * difference
         u_outer = SVector{12}(left_velocity..., outer_resultant...)
         return surface_flux_function(u_outer, u_inner, orientation, equations)
     else
         right_resultant = _intrinsic_beam_boundary_value(boundary_condition.right_resultant,
                                                          x, t, equations)
-        difference = SVector{6}(u_inner[7:12]) - right_resultant
-        outer_velocity = SVector{6}(u_inner[1:6]) -
+        difference = _intrinsic_beam_block(u_inner, 7) - right_resultant
+        outer_velocity = _intrinsic_beam_block(u_inner, 1) -
                          equations.right_impedance * difference
         u_outer = SVector{12}(outer_velocity..., right_resultant...)
         return surface_flux_function(u_inner, u_outer, orientation, equations)

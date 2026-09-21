@@ -29,12 +29,15 @@ L_1([v;\\omega]) =
     length(velocity) == 6 ||
         throw(ArgumentError("the velocity must contain exactly six entries"))
 
-    linear_velocity = SVector(velocity[1], velocity[2], velocity[3])
-    angular_velocity = SVector(velocity[4], velocity[5], velocity[6])
-    zero_block = zero(SMatrix{3, 3, eltype(linear_velocity), 9})
-
-    return SMatrix{6, 6}([intrinsic_beam_skew(angular_velocity) zero_block;
-                          intrinsic_beam_skew(linear_velocity) intrinsic_beam_skew(angular_velocity)])
+    v1, v2, v3, w1, w2, w3 = velocity
+    z = zero(v1)
+    # Scalar entries avoid the heap-allocated block concatenation of matrices.
+    return @SMatrix [z -w3 w2 z z z;
+                     w3 z -w1 z z z;
+                     -w2 w1 z z z z;
+                     z -v3 v2 z -w3 w2;
+                     v3 z -v1 w3 z -w1;
+                     -v2 v1 z -w2 w1 z]
 end
 
 """
@@ -53,12 +56,14 @@ L_2([f;m]) =
     length(resultant) == 6 ||
         throw(ArgumentError("the resultant must contain exactly six entries"))
 
-    force = SVector(resultant[1], resultant[2], resultant[3])
-    moment = SVector(resultant[4], resultant[5], resultant[6])
-    zero_block = zero(SMatrix{3, 3, eltype(force), 9})
-
-    return SMatrix{6, 6}([zero_block intrinsic_beam_skew(force);
-                          intrinsic_beam_skew(force) intrinsic_beam_skew(moment)])
+    f1, f2, f3, m1, m2, m3 = resultant
+    z = zero(f1)
+    return @SMatrix [z z z z -f3 f2;
+                     z z z f3 z -f1;
+                     z z z -f2 f1 z;
+                     z -f3 f2 z -m3 m2;
+                     f3 z -f1 m3 z -m1;
+                     -f2 f1 z -m2 m1 z]
 end
 
 """
@@ -77,12 +82,6 @@ E(\\kappa_0) =
     length(initial_curvature) == 3 ||
         throw(ArgumentError("the initial curvature must contain exactly three entries"))
 
-    curvature = SVector(initial_curvature[1], initial_curvature[2],
-                        initial_curvature[3])
-    ScalarT = eltype(curvature)
-    e1 = SVector(one(ScalarT), zero(ScalarT), zero(ScalarT))
-    zero_block = zero(SMatrix{3, 3, ScalarT, 9})
-
-    return SMatrix{6, 6}([intrinsic_beam_skew(curvature) zero_block;
-                          intrinsic_beam_skew(e1) intrinsic_beam_skew(curvature)])
+    k1, k2, k3 = initial_curvature
+    return intrinsic_beam_l1(SVector(one(k1), zero(k1), zero(k1), k1, k2, k3))
 end

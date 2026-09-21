@@ -1,3 +1,8 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using Printf
 using Serialization: deserialize
 
@@ -22,19 +27,15 @@ points_per_element >= 4 ||
     throw(ArgumentError("CANTILEVER_GEOMETRY_POINTS_PER_ELEMENT must be at least 4"))
 
 checkpoint = deserialize(checkpoint_path)
-checkpoint.format_version == 4 ||
-    error("expected a format-4 cantilever checkpoint")
+checkpoint.format_version in (4, 5) ||
+    error("expected a format-4 or format-5 cantilever checkpoint")
 length(checkpoint.rows) >= 1 ||
     error("checkpoint does not contain an accepted frequency")
 accepted_row = last(checkpoint.rows)
 
-ENV["CANTILEVER_ACCELERATION_RMS_G"] =
-    string(checkpoint.acceleration_rms_g)
-ENV["CANTILEVER_FREQUENCY_HZ"] = string(accepted_row.frequency_hz)
-ENV["CANTILEVER_POLYDEG"] = string(checkpoint.polydeg)
-ENV["CANTILEVER_REFINEMENT_LEVEL"] = string(checkpoint.refinement_level)
-ENV["CANTILEVER_CONSTRAINT_MULTIPLIER"] =
-    string(checkpoint.constraint_multiplier)
+for (key, value) in cantilever_checkpoint_environment(checkpoint, accepted_row)
+    ENV[key] = value
+end
 ENV["CANTILEVER_RAMP_CYCLES"] = "0"
 ENV["CANTILEVER_SETUP_ONLY"] = "true"
 
@@ -53,13 +54,12 @@ cycle_problem = remake(problem;
 cycle_solution = solve(cycle_problem, algorithm;
                        reltol = relative_tolerance,
                        abstol = absolute_tolerance,
-                       dtmax = cycle_period / 32.0,
+                       dtmax = maximum_step,
                        saveat = save_times_cycle,
                        save_start = true,
                        save_everystep = false,
                        maxiters = 10^7)
-@assert SciMLBase.successful_retcode(cycle_solution)
-@assert all(state -> all(isfinite, state), cycle_solution.u)
+require_complete_solution(cycle_solution, last(cycle_problem.tspan))
 
 function barycentric_weights(nodes)
     weights = ones(length(nodes))
@@ -172,14 +172,12 @@ ledger_path = joinpath(output_directory, "cycle_ledger.csv")
 
 open(geometry_path, "w") do io
     println(io, "frame,phase,material_coordinate,vertical,transverse,angle")
-    for (frame, (state, time)) in
-        enumerate(zip(cycle_solution.u, cycle_solution.t))
+    for (frame, (state, time)) in enumerate(zip(cycle_solution.u, cycle_solution.t))
         phase = time / cycle_period
-        coordinates, vertical, transverse, angles =
-            centerline_geometry(state)
+        coordinates, vertical, transverse, angles = centerline_geometry(state)
         for index in eachindex(coordinates)
             @printf(io, "%d,%.17g,%.17g,%.17g,%.17g,%.17g\n",
-                    frame - 1, phase, coordinates[index],
+                    frame-1, phase, coordinates[index],
                     vertical[index], transverse[index], angles[index])
         end
     end
@@ -188,25 +186,22 @@ end
 tips = [reconstruct_tip(state) for state in cycle_solution.u]
 open(tip_path, "w") do io
     println(io, "frame,phase,longitudinal,transverse,rotation")
-    for (frame, (tip, time)) in
-        enumerate(zip(tips, cycle_solution.t))
+    for (frame, (tip, time)) in enumerate(zip(tips, cycle_solution.t))
         @printf(io, "%d,%.17g,%.17g,%.17g,%.17g\n",
-                frame - 1, time / cycle_period,
+                frame-1, time/cycle_period,
                 tip[1], tip[2], tip[3])
     end
 end
 
 ledger = cantilever_cycle_ledger(cycle_solution.u, cycle_solution.t)
-net_boundary_dissipation =
-    ledger.left_boundary_dissipation +
-    ledger.right_boundary_dissipation -
-    ledger.sat_data_work
-compact_residual =
-    ledger.total_energy_change +
-    ledger.material_dissipation +
-    ledger.jump_dissipation +
-    net_boundary_dissipation -
-    ledger.physical_root_work
+net_boundary_dissipation = ledger.left_boundary_dissipation +
+                           ledger.right_boundary_dissipation -
+                           ledger.sat_data_work
+compact_residual = ledger.total_energy_change +
+                   ledger.material_dissipation +
+                   ledger.jump_dissipation +
+                   net_boundary_dissipation -
+                   ledger.physical_root_work
 open(ledger_path, "w") do io
     println(io,
             "normalized_frequency,periodicity_error,total_energy_change," *
@@ -219,7 +214,7 @@ open(ledger_path, "w") do io
             ledger.total_energy_change, ledger.physical_root_work,
             ledger.material_dissipation, ledger.jump_dissipation,
             net_boundary_dissipation, compact_residual,
-            abs(compact_residual) / abs(ledger.physical_root_work))
+            abs(compact_residual)/abs(ledger.physical_root_work))
 end
 
 println("Wrote ", geometry_path)

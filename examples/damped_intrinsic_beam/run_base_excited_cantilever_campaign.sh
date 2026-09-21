@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-    echo "usage: $0 {02g_upper|02g_lower|05g_upper|05g_lower|02g_refined_lower|05g_refined_upper}" >&2
+    echo "usage: $0 {02g_upper|02g_lower|05g_upper|05g_lower|02g_refined_lower|05g_refined_upper|05g_zero_gravity}" >&2
     exit 2
 fi
 
@@ -13,6 +13,7 @@ results_directory="${example_directory}/results"
 mkdir -p "${results_directory}"
 
 acceleration=
+gravity_multiplier=1.0
 polydeg=4
 refinement_level=1
 frequencies=
@@ -88,6 +89,17 @@ case "$1" in
         periodicity_tolerance=0.0005
         output_stem=farokhi_05g_k3n4_refined_up_sweep
         ;;
+    05g_zero_gravity)
+        acceleration=0.5
+        gravity_multiplier=0.0
+        frequencies="0.9774220104077285,1.0031291062778251,1.0185529459179299,1.0236935432382079,1.0288351627461085,1.0308928822914973,1.0319201511430482,1.0329495307557512,1.0350051256298216,1.0370617740940755,1.0391205403433936,1.0411750674403546,1.0432306552905128"
+        first_cycles=80
+        continuation_cycles=30
+        additional_cycles=40
+        maximum_cycles=190
+        periodicity_tolerance=0.0005
+        output_stem=gravity_sensitivity_05g_zero_k4n2
+        ;;
     *)
         echo "unknown campaign: $1" >&2
         exit 2
@@ -96,6 +108,7 @@ esac
 
 env \
     CANTILEVER_ACCELERATION_RMS_G="${acceleration}" \
+    CANTILEVER_GRAVITY_MULTIPLIER="${gravity_multiplier}" \
     CANTILEVER_POLYDEG="${polydeg}" \
     CANTILEVER_REFINEMENT_LEVEL="${refinement_level}" \
     CANTILEVER_SAMPLES_PER_CYCLE="${CANTILEVER_SAMPLES_PER_CYCLE:-96}" \

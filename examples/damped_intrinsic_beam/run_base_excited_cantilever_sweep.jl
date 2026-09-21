@@ -3,18 +3,14 @@ using LinearAlgebra: eigvals
 using Printf
 using Serialization: deserialize, serialize
 
-# Load the benchmark once. The short setup solve keeps the elixir directly
-# executable while avoiding an additional long fixed-frequency calculation
-# before the continuation sweep.
+# Load the benchmark once in setup-only mode, without an extra solve.
 ENV["CANTILEVER_SETTLING_CYCLES"] = "1"
 ENV["CANTILEVER_MEASUREMENT_CYCLES"] = "2"
 ENV["CANTILEVER_RAMP_CYCLES"] = "0"
 ENV["CANTILEVER_SETUP_ONLY"] = "true"
-ENV["CANTILEVER_SAMPLES_PER_CYCLE"] =
-    get(ENV, "CANTILEVER_SAMPLES_PER_CYCLE", "96")
+ENV["CANTILEVER_SAMPLES_PER_CYCLE"] = get(ENV, "CANTILEVER_SAMPLES_PER_CYCLE", "96")
 ENV["CANTILEVER_POLYDEG"] = get(ENV, "CANTILEVER_POLYDEG", "4")
-ENV["CANTILEVER_REFINEMENT_LEVEL"] =
-    get(ENV, "CANTILEVER_REFINEMENT_LEVEL", "1")
+ENV["CANTILEVER_REFINEMENT_LEVEL"] = get(ENV, "CANTILEVER_REFINEMENT_LEVEL", "1")
 Base.include(@__MODULE__,
              joinpath(@__DIR__, "elixir_base_excited_cantilever.jl"))
 
@@ -31,8 +27,7 @@ function dense_finite_difference_jacobian(state)
         cantilever_rhs!(perturbed_derivative, perturbed_state,
                         rhs_parameters, 0.0)
         perturbed_state[column] = state[column]
-        @views jacobian[:, column] .=
-            (perturbed_derivative .- base_derivative) ./ step
+        @views jacobian[:, column] .= (perturbed_derivative .- base_derivative) ./ step
     end
     return jacobian
 end
@@ -59,8 +54,8 @@ function response_metrics(states)
             longitudinal_minimum = minimum(value[1] for value in last_tip),
             rotation_peak = maximum(abs(value[3]) for value in last_tip),
             periodicity_error = maximum(maximum(abs,
-                                                 last_tip[index] -
-                                                 previous_tip[index])
+                                                last_tip[index] -
+                                                previous_tip[index])
                                         for index in eachindex(last_tip)))
 end
 
@@ -76,6 +71,8 @@ function solve_cycles(initial_state, cycles, frequency;
     local_period = 2.0 * pi / root_velocity.omega
     root_velocity.ramp_duration = ramp_cycles * local_period
     measurement_cycles = 2
+    cycles >= measurement_cycles ||
+        throw(ArgumentError("at least two cycles are required for periodicity measurement"))
     measurement_start = (cycles - measurement_cycles) * local_period
     save_times = range(measurement_start, cycles * local_period;
                        length = measurement_cycles *
@@ -98,10 +95,10 @@ function solve_cycles(initial_state, cycles, frequency;
                                              "CANTILEVER_STEPS_PER_PERIOD",
                                              "32")),
                            saveat = save_times,
-                           save_start = false,
+                           save_start = iszero(measurement_start),
                            save_everystep = false,
                            maxiters = 10^7)
-    @assert SciMLBase.successful_retcode(local_solution)
+    require_complete_solution(local_solution, last(local_problem.tspan))
     return local_solution, response_metrics(local_solution.u)
 end
 
@@ -124,6 +121,21 @@ periodicity_tolerance = parse(Float64,
                                   "CANTILEVER_SWEEP_PERIODICITY_TOLERANCE",
                                   "2e-3"))
 
+run_configuration = (;
+                     acceleration_rms_g, gravity_multiplier, polydeg, refinement_level,
+                     constraint_multiplier, normalized_frequencies, first_cycles,
+                     continuation_cycles,
+                     additional_cycles, maximum_cycles, periodicity_tolerance,
+                     samples_per_cycle,
+                     reltol = parse(Float64, get(ENV, "CANTILEVER_SWEEP_RELTOL", "1e-4")),
+                     abstol = parse(Float64, get(ENV, "CANTILEVER_SWEEP_ABSTOL", "1e-6")),
+                     steps_per_period = parse(Float64,
+                                              get(ENV, "CANTILEVER_STEPS_PER_PERIOD", "32")),
+                     ramp_cycles = parse(Float64,
+                                         get(ENV, "CANTILEVER_SWEEP_RAMP_CYCLES", "8")),
+                     use_sparse_jacobian)
+run_provenance = beam_run_provenance()
+
 mode = first_discrete_mode(split_problem.u0)
 linear_frequency_hz = imag(mode) / (2.0 * pi * FAROKHI_T)
 linear_damping_ratio = -real(mode) / abs(mode)
@@ -132,12 +144,12 @@ reference_frequency_hz = FAROKHI_REFERENCE_OMEGA1 /
 frequencies = normalized_frequencies .* linear_frequency_hz
 @printf("Unloaded Euler-Bernoulli reference frequency = %.8f Hz\n",
         reference_frequency_hz)
-@printf("Discrete gravity-loaded mode: lambda = %.8e %+.8ei, f1 = %.8f Hz, zeta = %.6e\n",
+@printf("Discrete equilibrium mode: lambda = %.8e %+.8ei, f1 = %.8f Hz, zeta = %.6e\n",
         real(mode), imag(mode), linear_frequency_hz, linear_damping_ratio)
 
 acceleration_label = @sprintf("%02dg", round(Int, 10 * acceleration_rms_g))
 output_path = get(ENV, "CANTILEVER_SWEEP_OUTPUT",
-                  joinpath(@__DIR__, "reference",
+                  joinpath(@__DIR__, "results",
                            "base_excited_cantilever_sweep_" *
                            acceleration_label * ".csv"))
 checkpoint_path = get(ENV, "CANTILEVER_SWEEP_CHECKPOINT",
@@ -181,11 +193,13 @@ function write_checkpoint(path, rows, continuation_state, next_index;
                           partial_cycles = 0)
     temporary_path = path * ".tmp"
     checkpoint = (;
-                  format_version = 4,
+                  format_version = 5,
+                  run_configuration, run_provenance,
                   acceleration_rms_g,
                   polydeg,
                   refinement_level,
                   constraint_multiplier,
+                  gravity_multiplier,
                   normalized_frequencies,
                   reference_frequency_hz,
                   linear_frequency_hz,
@@ -197,11 +211,11 @@ function write_checkpoint(path, rows, continuation_state, next_index;
     mv(temporary_path, path; force = true)
 
     archive_states = lowercase(get(ENV,
-                                   "CANTILEVER_SWEEP_ARCHIVE_STATES",
-                                   "true")) in ("1", "true", "yes")
+    "CANTILEVER_SWEEP_ARCHIVE_STATES",
+    "true")) in ("1", "true", "yes")
     if archive_states && iszero(partial_cycles)
         stem, extension = splitext(path)
-        point_path = @sprintf("%s_point_%03d%s", stem, next_index - 1,
+        point_path = @sprintf("%s_point_%03d%s", stem, next_index-1,
                               extension)
         point_temporary_path = point_path * ".tmp"
         serialize(point_temporary_path, checkpoint)
@@ -211,15 +225,20 @@ function write_checkpoint(path, rows, continuation_state, next_index;
 end
 
 resume_requested = lowercase(get(ENV, "CANTILEVER_SWEEP_RESUME",
-                                 "false")) in ("1", "true", "yes")
+"false")) in ("1", "true", "yes")
 rows = NamedTuple[]
 continuation_state = copy(split_problem.u0)
 first_index = 1
 partial_cycles = 0
 if resume_requested && isfile(checkpoint_path)
     checkpoint = deserialize(checkpoint_path)
-    checkpoint.format_version in (1, 3, 4) ||
-        error("unsupported sweep checkpoint format")
+    checkpoint.format_version == 5 ||
+        error("legacy checkpoint lacks full run provenance; use it for replay, not resume")
+    require_matching_configuration(checkpoint.run_configuration, run_configuration)
+    require_matching_configuration(checkpoint.run_provenance,
+                                   (; source_identity = run_provenance.source_identity,
+                                    julia_version = run_provenance.julia_version,
+                                    threads = run_provenance.threads))
     checkpoint.acceleration_rms_g == acceleration_rms_g ||
         error("checkpoint acceleration does not match this run")
     checkpoint.polydeg == polydeg ||
@@ -228,36 +247,61 @@ if resume_requested && isfile(checkpoint_path)
         error("checkpoint refinement level does not match this run")
     checkpoint.constraint_multiplier == constraint_multiplier ||
         error("checkpoint constraint multiplier does not match this run")
+    checkpoint_gravity_multiplier = checkpoint_gravity(checkpoint)
+    checkpoint_gravity_multiplier == gravity_multiplier ||
+        error("checkpoint gravity multiplier does not match this run")
     checkpoint.normalized_frequencies == normalized_frequencies ||
         error("checkpoint frequency path does not match this run")
     checkpoint.linear_frequency_hz == linear_frequency_hz ||
         error("checkpoint discrete frequency does not match this run")
-    if checkpoint.format_version in (3, 4)
-        checkpoint.reference_frequency_hz == reference_frequency_hz ||
-            error("checkpoint reference frequency does not match this run")
-        rows = checkpoint.rows
-    else
-        # Version 1 already used the correct gravity-loaded normalization,
-        # but did not retain the unloaded Euler-Bernoulli diagnostic column.
-        rows = NamedTuple[merge(row,
-                                (normalized_frequency =
-                                     row.frequency_over_discrete_f1,
-                                 frequency_over_unloaded_omega1 =
-                                     row.frequency_hz /
-                                     reference_frequency_hz))
-                          for row in checkpoint.rows]
-    end
+    checkpoint.reference_frequency_hz == reference_frequency_hz ||
+        error("checkpoint reference frequency does not match this run")
+    rows = checkpoint.rows
     continuation_state = checkpoint.continuation_state
     first_index = checkpoint.next_index
-    partial_cycles = checkpoint.format_version == 4 ?
-                     checkpoint.partial_cycles : 0
+    partial_cycles = checkpoint.partial_cycles
     @printf("Resuming %s at point %d of %d after %d partial cycles\n",
             checkpoint_path, first_index, length(frequencies),
             partial_cycles)
 end
 
+metadata_path = replace(output_path, ".csv" => "_metadata.txt")
+open(metadata_path, "w") do io
+    println(io, "run_configuration = ", run_configuration)
+    println(io, "run_provenance = ", run_provenance)
+    println(io, "generated_at = ", Dates.format(now(), dateformat"yyyy-mm-ddTHH:MM:SS"))
+    println(io, "polydeg = ", polydeg)
+    println(io, "refinement_level = ", refinement_level)
+    println(io, "cells = ", 2^refinement_level)
+    println(io, "constraint_multiplier = ", constraint_multiplier)
+    println(io, "gravity_multiplier = ", gravity_multiplier)
+    println(io, "gamma = ", cantilever_gamma)
+    println(io, "linear_eigenvalue = ", mode)
+    println(io, "reference_frequency_hz = ", reference_frequency_hz)
+    println(io, "linear_frequency_hz = ", linear_frequency_hz)
+    println(io, "linear_damping_ratio = ", linear_damping_ratio)
+    println(io,
+            "normalized_frequency_definition = frequency / configuration-specific discrete first mode")
+    println(io, "normalized_frequencies = ", join(normalized_frequencies, ","))
+    println(io, "first_cycles = ", first_cycles)
+    println(io, "continuation_cycles = ", continuation_cycles)
+    println(io, "additional_cycles = ", additional_cycles)
+    println(io, "maximum_cycles = ", maximum_cycles)
+    println(io, "periodicity_tolerance = ", periodicity_tolerance)
+    println(io, "archive_states = ",
+            get(ENV, "CANTILEVER_SWEEP_ARCHIVE_STATES", "true"))
+    println(io, "relative_tolerance = ",
+            get(ENV, "CANTILEVER_SWEEP_RELTOL", "1e-4"))
+    println(io, "absolute_tolerance = ",
+            get(ENV, "CANTILEVER_SWEEP_ABSTOL", "1e-6"))
+    println(io, "steps_per_period_limit = ",
+            get(ENV, "CANTILEVER_STEPS_PER_PERIOD", "32"))
+    println(io, "source = Farokhi, Xia, and Erturk (2022), DOI 10.1007/s11071-021-07023-9")
+end
+
 let continuation_state = continuation_state,
     resumed_partial_cycles = partial_cycles
+
     for index in first_index:length(frequencies)
         frequency = frequencies[index]
         is_partial_resume = index == first_index &&
@@ -281,14 +325,14 @@ let continuation_state = continuation_state,
         flush(stdout)
 
         while metrics.periodicity_error > periodicity_tolerance &&
-              total_cycles < maximum_cycles
+            total_cycles < maximum_cycles
             # Save a same-frequency restart before every additional block.
             # If the next block is interrupted, only that block is repeated.
             write_checkpoint(checkpoint_path, rows, continuation_state,
                              index; partial_cycles = total_cycles)
             extra_solution, metrics = solve_cycles(continuation_state,
-                                                    additional_cycles,
-                                                    frequency)
+                                                   additional_cycles,
+                                                   frequency)
             continuation_state = copy(extra_solution.u[end])
             total_cycles += additional_cycles
             local_solution = extra_solution
@@ -304,7 +348,7 @@ let continuation_state = continuation_state,
                frequency_hz = frequency,
                normalized_frequency = frequency / linear_frequency_hz,
                frequency_over_unloaded_omega1 =
-                   frequency / reference_frequency_hz,
+               frequency / reference_frequency_hz,
                omega = root_velocity.omega,
                transverse_peak = metrics.transverse_peak,
                longitudinal_minimum = metrics.longitudinal_minimum,
@@ -328,35 +372,6 @@ let continuation_state = continuation_state,
 end
 
 write_rows(output_path, rows)
-
-metadata_path = replace(output_path, ".csv" => "_metadata.txt")
-open(metadata_path, "w") do io
-    println(io, "generated_at = ", Dates.format(now(), dateformat"yyyy-mm-ddTHH:MM:SS"))
-    println(io, "polydeg = ", polydeg)
-    println(io, "refinement_level = ", refinement_level)
-    println(io, "cells = ", 2^refinement_level)
-    println(io, "constraint_multiplier = ", constraint_multiplier)
-    println(io, "linear_eigenvalue = ", mode)
-    println(io, "reference_frequency_hz = ", reference_frequency_hz)
-    println(io, "linear_frequency_hz = ", linear_frequency_hz)
-    println(io, "linear_damping_ratio = ", linear_damping_ratio)
-    println(io, "normalized_frequency_definition = frequency / gravity-loaded discrete first mode")
-    println(io, "normalized_frequencies = ", join(normalized_frequencies, ","))
-    println(io, "first_cycles = ", first_cycles)
-    println(io, "continuation_cycles = ", continuation_cycles)
-    println(io, "additional_cycles = ", additional_cycles)
-    println(io, "maximum_cycles = ", maximum_cycles)
-    println(io, "periodicity_tolerance = ", periodicity_tolerance)
-    println(io, "archive_states = ",
-            get(ENV, "CANTILEVER_SWEEP_ARCHIVE_STATES", "true"))
-    println(io, "relative_tolerance = ",
-            get(ENV, "CANTILEVER_SWEEP_RELTOL", "1e-4"))
-    println(io, "absolute_tolerance = ",
-            get(ENV, "CANTILEVER_SWEEP_ABSTOL", "1e-6"))
-    println(io, "steps_per_period_limit = ",
-            get(ENV, "CANTILEVER_STEPS_PER_PERIOD", "32"))
-    println(io, "source = Farokhi, Xia, and Erturk (2022), DOI 10.1007/s11071-021-07023-9")
-end
 
 println("Wrote ", output_path)
 println("Wrote ", metadata_path)

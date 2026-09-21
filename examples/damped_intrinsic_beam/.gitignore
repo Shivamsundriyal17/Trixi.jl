@@ -6,6 +6,7 @@
 /results/*.jls
 /results/*.txt
 /results/**/*.csv
+/results/pre_push_campaigns/
 __pycache__/
 !/Manifest.toml
 !/LocalPreferences.toml

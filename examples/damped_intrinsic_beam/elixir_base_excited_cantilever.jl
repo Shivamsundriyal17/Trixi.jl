@@ -1,3 +1,8 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using LinearAlgebra: Diagonal, dot
 using OrdinaryDiffEqRosenbrock
 using Printf
@@ -28,23 +33,29 @@ const FAROKHI_A = FAROKHI_B * FAROKHI_H
 const FAROKHI_I_WEAK = FAROKHI_B * FAROKHI_H^3 / 12.0
 const FAROKHI_I_STRONG = FAROKHI_H * FAROKHI_B^3 / 12.0
 const FAROKHI_T = FAROKHI_L^2 *
-                   sqrt(FAROKHI_RHO * FAROKHI_A /
-                        (FAROKHI_E * FAROKHI_I_WEAK))
+                  sqrt(FAROKHI_RHO * FAROKHI_A /
+                       (FAROKHI_E * FAROKHI_I_WEAK))
 const FAROKHI_GAMMA = FAROKHI_RHO * FAROKHI_A * FAROKHI_G *
-                       FAROKHI_L^3 / (FAROKHI_E * FAROKHI_I_WEAK)
+                      FAROKHI_L^3 / (FAROKHI_E * FAROKHI_I_WEAK)
 const FAROKHI_CHI_WEAK = FAROKHI_I_WEAK /
-                          (FAROKHI_A * FAROKHI_L^2)
+                         (FAROKHI_A * FAROKHI_L^2)
 const FAROKHI_CHI_STRONG = FAROKHI_I_STRONG /
-                            (FAROKHI_A * FAROKHI_L^2)
+                           (FAROKHI_A * FAROKHI_L^2)
 const FAROKHI_CHI_POLAR = FAROKHI_CHI_WEAK + FAROKHI_CHI_STRONG
 const FAROKHI_AXIAL_STIFFNESS = FAROKHI_A * FAROKHI_L^2 /
-                                 FAROKHI_I_WEAK
+                                FAROKHI_I_WEAK
 const FAROKHI_SHEAR_STIFFNESS = FAROKHI_SHEAR_CORRECTION /
-                                 (2.0 * (1.0 + FAROKHI_NU)) *
-                                 FAROKHI_AXIAL_STIFFNESS
+                                (2.0 * (1.0 + FAROKHI_NU)) *
+                                FAROKHI_AXIAL_STIFFNESS
 const FAROKHI_STRONG_BENDING_STIFFNESS = FAROKHI_I_STRONG /
-                                          FAROKHI_I_WEAK
+                                         FAROKHI_I_WEAK
 const FAROKHI_ETA_D = 0.0037
+
+gravity_multiplier = parse(Float64,
+                           get(ENV, "CANTILEVER_GRAVITY_MULTIPLIER", "1.0"))
+gravity_multiplier >= 0.0 ||
+    throw(ArgumentError("CANTILEVER_GRAVITY_MULTIPLIER must be nonnegative"))
+cantilever_gamma = gravity_multiplier * FAROKHI_GAMMA
 
 acceleration_rms_g = parse(Float64,
                            get(ENV, "CANTILEVER_ACCELERATION_RMS_G", "0.2"))
@@ -66,11 +77,11 @@ shear_stiffness = constraint_multiplier * FAROKHI_SHEAR_STIFFNESS
 # Components are [v1,v2,v3,omega1,omega2,omega3] and
 # [f1,f2,f3,m1,m2,m3]. The experiment is invariant in the (1,2) plane.
 mass_matrix = Diagonal([1.0, 1.0, 1.0,
-                        FAROKHI_CHI_POLAR, FAROKHI_CHI_STRONG,
-                        FAROKHI_CHI_WEAK])
+                           FAROKHI_CHI_POLAR, FAROKHI_CHI_STRONG,
+                           FAROKHI_CHI_WEAK])
 torsional_stiffness = 4.0 / (2.0 * (1.0 + FAROKHI_NU))
 stiffnesses = [axial_stiffness, shear_stiffness, shear_stiffness,
-               torsional_stiffness, FAROKHI_STRONG_BENDING_STIFFNESS, 1.0]
+    torsional_stiffness, FAROKHI_STRONG_BENDING_STIFFNESS, 1.0]
 flexibility_matrix = Diagonal(1.0 ./ stiffnesses)
 
 # Farokhi et al. apply Kelvin--Voigt damping only to weak-axis bending.
@@ -81,7 +92,7 @@ damping_matrix = Diagonal([0.0, 0.0, 0.0, 0.0, 0.0, FAROKHI_ETA_D])
 function initial_condition(x, t, equations::DampedIntrinsicBeamEquations1D)
     # Exact straight equilibrium under the initially vertical dead load:
     # f1_x - gamma = 0, f1(1) = 0.
-    f1 = -FAROKHI_GAMMA * (1.0 - x[1])
+    f1 = -cantilever_gamma * (1.0 - x[1])
     return SVector(0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                    f1, 0.0, 0.0, 0.0, 0.0, 0.0)
 end
@@ -183,9 +194,9 @@ function reconstruct_angle!(angles, state, parameters::CantileverRHSParameters)
     left_angle = 0.0
     for element in parameters.element_order
         jacobian = parameters.volume_jacobians[element]
-        for i in 1:parameters.nnodes
+        for i in 1:(parameters.nnodes)
             integral = 0.0
-            for j in 1:parameters.nnodes
+            for j in 1:(parameters.nnodes)
                 # Total curvature is kappa_0 + C_m*m. Here kappa_0=0.
                 integral += parameters.integration_matrix[i, j] *
                             parameters.bending_flexibility *
@@ -194,7 +205,7 @@ function reconstruct_angle!(angles, state, parameters::CantileverRHSParameters)
             angles[i, element] = left_angle + jacobian * integral
         end
         full_integral = 0.0
-        for j in 1:parameters.nnodes
+        for j in 1:(parameters.nnodes)
             full_integral += parameters.quadrature_weights[j] *
                              parameters.bending_flexibility *
                              state_array[12, j, element]
@@ -209,7 +220,7 @@ function add_dead_gravity!(derivative, state,
     reconstruct_angle!(parameters.angle_cache, state, parameters)
     derivative_array = reshape(derivative, 12, parameters.nnodes,
                                parameters.nelements)
-    for element in 1:parameters.nelements, i in 1:parameters.nnodes
+    for element in 1:(parameters.nelements), i in 1:(parameters.nnodes)
         angle = parameters.angle_cache[i, element]
         # R(angle)' * (-gamma*E1) in the material frame.
         derivative_array[1, i, element] -= parameters.gamma * cos(angle)
@@ -226,7 +237,7 @@ rhs_parameters = CantileverRHSParameters(semi, parabolic_derivative,
                                          collect(solver.basis.weights),
                                          nnodes, nelements,
                                          flexibility_matrix[6, 6],
-                                         FAROKHI_GAMMA)
+                                         cantilever_gamma)
 
 function cantilever_rhs!(derivative, state,
                          parameters::CantileverRHSParameters, t)
@@ -243,6 +254,10 @@ measurement_cycles = parse(Int,
                            get(ENV, "CANTILEVER_MEASUREMENT_CYCLES", "2"))
 samples_per_cycle = parse(Int,
                           get(ENV, "CANTILEVER_SAMPLES_PER_CYCLE", "96"))
+measurement_cycles >= 2 ||
+    throw(ArgumentError("at least two measurement cycles are required"))
+samples_per_cycle >= 2 ||
+    throw(ArgumentError("at least two samples per cycle are required"))
 total_cycles = ceil(Int, ramp_cycles) + settling_cycles + measurement_cycles
 t_end = total_cycles * period
 measurement_start = t_end - measurement_cycles * period
@@ -285,7 +300,7 @@ function numerical_jacobian_sparsity(rhs!, initial_state, parameters)
 end
 
 use_sparse_jacobian = lowercase(get(ENV, "CANTILEVER_SPARSE_JACOBIAN",
-                                    "true")) in ("1", "true", "yes")
+"true")) in ("1", "true", "yes")
 jacobian_prototype = use_sparse_jacobian ?
                      numerical_jacobian_sparsity(cantilever_rhs!,
                                                  split_problem.u0,
@@ -314,7 +329,7 @@ algorithm = Rodas5P(;
                     autodiff = OrdinaryDiffEqRosenbrock.AutoFiniteDiff(),
                     linsolve = linear_solver)
 setup_only = lowercase(get(ENV, "CANTILEVER_SETUP_ONLY",
-                           "false")) in ("1", "true", "yes")
+"false")) in ("1", "true", "yes")
 solution = setup_only ?
            nothing :
            solve(problem, algorithm;
@@ -322,13 +337,12 @@ solution = setup_only ?
                  abstol = absolute_tolerance,
                  dtmax = maximum_step,
                  saveat = save_times,
-                 save_start = false,
+                 save_start = iszero(measurement_start),
                  save_everystep = false,
                  maxiters = 10^7)
 
 if !setup_only
-    @assert SciMLBase.successful_retcode(solution)
-    @assert all(state -> all(isfinite, state), solution.u)
+    require_complete_solution(solution, last(problem.tspan))
 end
 
 function reconstruct_tip(state)
@@ -382,17 +396,16 @@ function gravitational_potential(state)
             gamma1 = 1.0 + flexibility_matrix[1, 1] * f1
             gamma2 = flexibility_matrix[2, 2] * f2
             angle = angle_cache[i, element]
-            vertical_derivative[i] =
-                cos(angle) * gamma1 - sin(angle) * gamma2
+            vertical_derivative[i] = cos(angle) * gamma1 - sin(angle) * gamma2
         end
-        vertical_positions[:, element] .=
-            left_vertical .+
-            jacobian .* (integration_matrix * vertical_derivative)
+        vertical_positions[:, element] .= left_vertical .+
+                                          jacobian .*
+                                          (integration_matrix * vertical_derivative)
         left_vertical += jacobian *
                          dot(solver.basis.weights, vertical_derivative)
     end
 
-    return FAROKHI_GAMMA * beam_quadrature_sum() do i, element
+    return cantilever_gamma * beam_quadrature_sum() do i, element
         vertical_positions[i, element]
     end
 end
@@ -424,11 +437,10 @@ function cantilever_ledger_terms(state, t)
     state_array = reshape(state, 12, nnodes, nelements)
     gradients = viscous_container.gradients
     material_dissipation = beam_quadrature_sum() do i, element
-        state_node = SVector{12}(state_array[:, i, element])
-        gradient_node = SVector{12}(gradients[:, i, element])
-        damping_resultant =
-            intrinsic_beam_damping_resultant(state_node, gradient_node,
-                                              equations_parabolic)
+        state_node = beam_node(state_array, i, element)
+        gradient_node = beam_node(gradients, i, element)
+        damping_resultant = intrinsic_beam_damping_resultant(state_node, gradient_node,
+                                                             equations_parabolic)
         damping_resultant[6]^2 / FAROKHI_ETA_D
     end
 
@@ -436,37 +448,32 @@ function cantilever_ledger_terms(state, t)
     for index in 1:(length(element_order) - 1)
         left_element = element_order[index]
         right_element = element_order[index + 1]
-        jump = SVector{12}(state_array[:, end, left_element] -
-                           state_array[:, 1, right_element])
+        jump = beam_node(state_array, size(state_array, 2), left_element) -
+               beam_node(state_array, 1, right_element)
         jump_dissipation += 0.5 *
                             dot(jump, capacity_abs_flux * jump)
     end
 
     left_element = first(element_order)
     right_element = last(element_order)
-    left_state = SVector{12}(state_array[:, 1, left_element])
-    right_state = SVector{12}(state_array[:, end, right_element])
+    left_state = beam_node(state_array, 1, left_element)
+    right_state = beam_node(state_array, size(state_array, 2), right_element)
     left_velocity = SVector{6}(left_state[1:6])
     left_resultant = SVector{6}(left_state[7:12])
     right_resultant = SVector{6}(right_state[7:12])
-    left_gradient = SVector{12}(gradients[:, 1, left_element])
-    left_damping_resultant =
-        intrinsic_beam_damping_resultant(left_state, left_gradient,
-                                          equations_parabolic)
+    left_gradient = beam_node(gradients, 1, left_element)
+    left_damping_resultant = intrinsic_beam_damping_resultant(left_state, left_gradient,
+                                                              equations_parabolic)
     prescribed_velocity = root_velocity(SVector(0.0), t,
                                         equations_hyperbolic)
 
-    left_boundary_dissipation =
-        dot(left_velocity,
-            equations_hyperbolic.left_impedance * left_velocity)
-    right_boundary_dissipation =
-        dot(right_resultant,
-            equations_hyperbolic.right_impedance * right_resultant)
-    physical_root_power =
-        -dot(prescribed_velocity, left_resultant + left_damping_resultant)
-    sat_data_power =
-        dot(prescribed_velocity,
-            equations_hyperbolic.left_impedance * left_velocity)
+    left_boundary_dissipation = dot(left_velocity,
+                                    equations_hyperbolic.left_impedance * left_velocity)
+    right_boundary_dissipation = dot(right_resultant,
+                                     equations_hyperbolic.right_impedance * right_resultant)
+    physical_root_power = -dot(prescribed_velocity, left_resultant + left_damping_resultant)
+    sat_data_power = dot(prescribed_velocity,
+                         equations_hyperbolic.left_impedance * left_velocity)
 
     return SVector(material_dissipation, jump_dissipation,
                    left_boundary_dissipation, right_boundary_dissipation,
@@ -484,8 +491,7 @@ function cantilever_cycle_ledger(states, times)
     for index in 2:length(states)
         current_terms = cantilever_ledger_terms(states[index], times[index])
         step = times[index] - times[index - 1]
-        integrated_terms .+=
-            0.5 * step .* (previous_terms .+ current_terms)
+        integrated_terms .+= 0.5 * step .* (previous_terms .+ current_terms)
         previous_terms = current_terms
     end
 
@@ -524,7 +530,7 @@ else
     longitudinal_minimum = minimum(value[1] for value in last_tip)
     rotation_peak = maximum(abs(value[3]) for value in last_tip)
     periodicity_error = maximum(maximum(abs,
-                                         last_tip[i] - previous_tip[i])
+                                        last_tip[i] - previous_tip[i])
                                 for i in eachindex(last_tip))
 
     result_local = (;
@@ -532,7 +538,7 @@ else
                     frequency_hz,
                     omega,
                     frequency_over_unloaded_omega1 =
-                        omega / FAROKHI_REFERENCE_OMEGA1,
+                    omega / FAROKHI_REFERENCE_OMEGA1,
                     acceleration,
                     constraint_multiplier,
                     polydeg,

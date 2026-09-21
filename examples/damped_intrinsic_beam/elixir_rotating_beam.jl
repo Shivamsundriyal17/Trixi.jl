@@ -1,6 +1,12 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using LinearAlgebra: Diagonal, dot
 using OrdinaryDiffEqLowStorageRK
 using Trixi
+using Trixi: SMatrix
 
 # Full nonlinear spin-up from rest; no steady-branch reduction is imposed.
 case_name = get(ENV, "ROTATING_CASE", "baseline")
@@ -96,8 +102,8 @@ volume_jacobians = [abs(inv(semi.cache.elements.inverse_jacobian[element]))
 capacity_abs_flux = equations_hyperbolic.capacity_matrix *
                     equations_hyperbolic.propagation_matrix_abs
 damping_operator_inverse = iszero(damping_multiplier) ?
-                           zeros(6, 6) :
-                           inv(Matrix(equations_hyperbolic.damping_operator))
+                           zero(SMatrix{6, 6, Float64, 36}) :
+                           SMatrix{6, 6}(inv(Matrix(equations_hyperbolic.damping_operator)))
 
 function beam_quadrature_sum(function_)
     value = 0.0
@@ -108,7 +114,23 @@ function beam_quadrature_sum(function_)
     return value
 end
 
+rotating_ledger_parameters = (; semi, quadrature_weights, volume_jacobians,
+                              element_order, capacity_abs_flux, damping_operator_inverse,
+                              damping_multiplier, root_velocity)
+
 function rotating_ledger_terms(state, t)
+    rotating_ledger_terms(state, t, rotating_ledger_parameters)
+end
+
+function rotating_ledger_terms(state, t, parameters)
+    (; semi, quadrature_weights, volume_jacobians, element_order,
+    capacity_abs_flux, damping_operator_inverse, damping_multiplier,
+    root_velocity) = parameters
+    mesh = semi.mesh
+    solver = semi.solver
+    solver_parabolic = semi.solver_parabolic
+    equations_hyperbolic = semi.equations
+    equations_parabolic = semi.equations_parabolic
     # Only the auxiliary gradient is needed here. Calling `rhs_parabolic!`
     # would also form the viscous flux, its divergence, and all source terms
     # after every accepted Runge--Kutta step.
@@ -129,17 +151,16 @@ function rotating_ledger_terms(state, t)
                           length(volume_jacobians))
     gradients = viscous_container.gradients
 
-    material_dissipation = if iszero(damping_multiplier)
-        0.0
-    else
-        beam_quadrature_sum() do i, element
-            state_node = SVector{12}(state_array[:, i, element])
-            gradient_node = SVector{12}(gradients[:, i, element])
-            damping_resultant = intrinsic_beam_damping_resultant(state_node,
-                                                                 gradient_node,
+    material_dissipation = zero(eltype(state))
+    if !iszero(damping_multiplier)
+        for element in eachindex(volume_jacobians), i in eachindex(quadrature_weights)
+            state_node = beam_node(state_array, i, element)
+            gradient_node = beam_node(gradients, i, element)
+            damping_resultant = intrinsic_beam_damping_resultant(state_node, gradient_node,
                                                                  equations_parabolic)
-            dot(damping_resultant,
-                damping_operator_inverse * damping_resultant)
+            material_dissipation += volume_jacobians[element] * quadrature_weights[i] *
+                                    dot(damping_resultant,
+                                        damping_operator_inverse * damping_resultant)
         end
     end
 
@@ -147,20 +168,20 @@ function rotating_ledger_terms(state, t)
     for index in 1:(length(element_order) - 1)
         left_element = element_order[index]
         right_element = element_order[index + 1]
-        jump = SVector{12}(state_array[:, end, left_element] -
-                           state_array[:, 1, right_element])
+        jump = beam_node(state_array, size(state_array, 2), left_element) -
+               beam_node(state_array, 1, right_element)
         jump_dissipation += 0.5 *
                             dot(jump, capacity_abs_flux * jump)
     end
 
     left_element = first(element_order)
     right_element = last(element_order)
-    left_state = SVector{12}(state_array[:, 1, left_element])
-    right_state = SVector{12}(state_array[:, end, right_element])
+    left_state = beam_node(state_array, 1, left_element)
+    right_state = beam_node(state_array, size(state_array, 2), right_element)
     left_velocity = SVector{6}(left_state[1:6])
     left_resultant = SVector{6}(left_state[7:12])
     right_resultant = SVector{6}(right_state[7:12])
-    left_gradient = SVector{12}(gradients[:, 1, left_element])
+    left_gradient = beam_node(gradients, 1, left_element)
     left_damping_resultant = intrinsic_beam_damping_resultant(left_state,
                                                               left_gradient,
                                                               equations_parabolic)
@@ -185,10 +206,10 @@ end
 
 # The paper protocol uses k=3, eight cells, alternating auxiliary traces, and
 # the conservative CFL 0.01. Since the mesh and characteristic speeds are
-# constant, the CFL step computed at t=0 remains valid throughout the run.
+# constant. Cap the initial wave-CFL step by the principal diffusion estimate;
+# the fixed mesh keeps this cap constant throughout the run.
 cfl = parse(Float64, get(ENV, "ROTATING_CFL", "0.01"))
-stepsize_callback = StepsizeCallback(cfl = cfl)
-time_step = stepsize_callback(ode)
+time_step = beam_explicit_timestep(ode, cfl)
 save_count = parse(Int, get(ENV, "ROTATING_SAVE_COUNT", "401"))
 save_times = range(first(tspan), last(tspan); length = save_count)
 
@@ -225,7 +246,7 @@ sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
             saveat = save_times,
             ode_default_options()...)
 
-@assert all(isfinite, sol.u[end])
+require_complete_solution(sol, last(tspan))
 energy_history = [Trixi.integrate(entropy, state, semi; normalize = false)
                   for state in sol.u]
 steady_energy = beam_quadrature_sum() do i, element

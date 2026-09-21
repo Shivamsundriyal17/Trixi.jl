@@ -1,3 +1,8 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using OrdinaryDiffEqStabilizedRK
 using Trixi
 
@@ -31,68 +36,20 @@ mass_matrix = [1.84147 0.25403 0.34207 0.11081 0.05841 0.02270;
 damping_matrix = 0.01 * flexibility_matrix
 flexibility_inverse = inv(flexibility_matrix)
 
-@inline profile_base_quartic(x, t) = 1.0 + 0.25 * (x + t)
-@inline profile_base_poly7(x, t) = 1.0 + 0.5 * (x + t)
-
-@inline function traveling_profile(x, t)
-    mms_profile == "quartic" && return profile_base_quartic(x, t)^4
-    mms_profile == "exp1" && return exp(x + t)
-    mms_profile == "exp2" && return exp(2.0 * (x + t))
-    return profile_base_poly7(x, t)^7
+if !isdefined(@__MODULE__, :RichMMSFunctions)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "rich_mms_functions.jl"))
 end
+using .RichMMSFunctions
 
-@inline function traveling_profile_1(x, t)
-    mms_profile == "quartic" && return profile_base_quartic(x, t)^3
-    mms_profile == "exp1" && return exp(x + t)
-    mms_profile == "exp2" && return 2.0 * exp(2.0 * (x + t))
-    return 3.5 * profile_base_poly7(x, t)^6
-end
-
-@inline function traveling_profile_2(x, t)
-    mms_profile == "quartic" && return 0.75 * profile_base_quartic(x, t)^2
-    mms_profile == "exp1" && return exp(x + t)
-    mms_profile == "exp2" && return 4.0 * exp(2.0 * (x + t))
-    return 10.5 * profile_base_poly7(x, t)^5
-end
-@inline rotated_direction(t) = mms_direction +
-                               mms_growth_rate * t * mms_geometry_action
-
-function manufactured_solution(x, t)
-    u1 = traveling_profile(x, t) * rotated_direction(t)
-    elastic_strain = u1 - mms_lambda * mms_axial_shift
-    u2 = SVector{6}(flexibility_inverse * elastic_strain)
-    return SVector{12}(u1..., u2...)
-end
-
-function manufactured_solution_t(x, t)
-    u1_t = mms_growth_rate * traveling_profile(x, t) * mms_geometry_action +
-           traveling_profile_1(x, t) * rotated_direction(t)
-    u2_t = SVector{6}(flexibility_inverse * u1_t)
-    return SVector{12}(u1_t..., u2_t...)
-end
-
-function manufactured_solution_x(x, t)
-    u1_x = traveling_profile_1(x, t) * rotated_direction(t)
-    u2_x = SVector{6}(flexibility_inverse * u1_x)
-    return SVector{12}(u1_x..., u2_x...)
-end
-
-function manufactured_solution_xx(x, t)
-    u1_xx = traveling_profile_2(x, t) * rotated_direction(t)
-    u2_xx = SVector{6}(flexibility_inverse * u1_xx)
-    return SVector{12}(u1_xx..., u2_xx...)
-end
+mms_parameters = RichBeamMMS(mms_lambda, flexibility_inverse, mms_profile)
+manufactured_solution = RichField(mms_parameters, :value)
+manufactured_solution_t = RichField(mms_parameters, :time)
+manufactured_solution_x = RichField(mms_parameters, :space)
+manufactured_solution_xx = RichField(mms_parameters, :space2)
+physical_external_force = RichForce(mms_parameters)
 
 function initial_condition(x, t, equations::DampedIntrinsicBeamEquations1D)
-    return manufactured_solution(x[1], t)
-end
-
-function physical_external_force(x, t, equations)
-    return manufactured_force_damped_intrinsic_beam(x, t, equations_parabolic,
-                                                    manufactured_solution,
-                                                    manufactured_solution_t,
-                                                    manufactured_solution_x,
-                                                    manufactured_solution_xx)
+    return RichField(equations.external_force.parameters, :value)(x[1], t)
 end
 
 equations_hyperbolic = DampedIntrinsicBeamEquations1D(;
@@ -107,18 +64,18 @@ equations_parabolic = DampedIntrinsicBeamDiffusion1D(equations_hyperbolic)
 @inline mms_coordinate(x) = first(x)
 
 function exact_left_velocity(x, t, equations)
-    u = manufactured_solution(mms_coordinate(x), t)
+    u = RichField(equations.external_force.parameters, :value)(mms_coordinate(x), t)
     return SVector{6}(u[1:6])
 end
 
 function exact_right_resultant(x, t, equations)
-    u = manufactured_solution(mms_coordinate(x), t)
+    u = RichField(equations.external_force.parameters, :value)(mms_coordinate(x), t)
     return SVector{6}(u[7:12])
 end
 
 function exact_right_damping_resultant(x, t, equations)
-    u_t = manufactured_solution_t(mms_coordinate(x), t)
-    return SVector{6}(damping_matrix * SVector{6}(u_t[7:12]))
+    u_t = RichField(equations.external_force.parameters, :time)(mms_coordinate(x), t)
+    return equations.damping_matrix * SVector{6}(u_t[7:12])
 end
 
 function verify_manufactured_solution()
@@ -134,6 +91,7 @@ function verify_manufactured_solution()
     minimum_r_tau_component = Inf
     for x in range(0.0, beam_length; length = 9),
         t in range(0.0, 1.0; length = 9)
+
         source = manufactured_source_damped_intrinsic_beam(x, t,
                                                            equations_parabolic,
                                                            manufactured_solution,
@@ -169,9 +127,8 @@ function verify_manufactured_solution()
                                             source_lower_residual)
         maximum_lower_residual = max(maximum_lower_residual,
                                      maximum(abs, compatibility_residual))
-        maximum_normalized_source_lower_residual =
-            max(maximum_normalized_source_lower_residual,
-                normalized_source_lower_residual)
+        maximum_normalized_source_lower_residual = max(maximum_normalized_source_lower_residual,
+                                                       normalized_source_lower_residual)
         maximum_normalized_lower_residual = max(maximum_normalized_lower_residual,
                                                 normalized_lower_residual)
         minimum_geometry_activity = min(minimum_geometry_activity,
@@ -189,8 +146,9 @@ function verify_manufactured_solution()
                                                              equations_parabolic)
         constitutive_resultant = damping_matrix * SVector{6}(u_t[7:12])
         maximum_constitutive_residual = max(maximum_constitutive_residual,
-                                            maximum(abs, damping_resultant -
-                                                         constitutive_resultant))
+                                            maximum(abs,
+                                                    damping_resultant -
+                                                    constitutive_resultant))
         minimum_u1_component = min(minimum_u1_component, minimum(u1))
         minimum_u2_component = min(minimum_u2_component, minimum(u2))
         minimum_r_tau_component = min(minimum_r_tau_component,
@@ -212,19 +170,12 @@ end
 rich_mms_exact_audit = verify_manufactured_solution()
 
 sigma = 1.0
-@inline function flux_mms(u_ll, u_rr, orientation,
-                          equations::DampedIntrinsicBeamEquations1D)
-    central_flux = 0.5 * (flux(u_ll, orientation, equations) +
-                    flux(u_rr, orientation, equations))
-    dissipation = 0.5 * sigma * equations.propagation_matrix_abs *
-                  (u_ll - u_rr)
-    return central_flux + dissipation
-end
+flux_mms = RichFlux(sigma)
 
 boundary_condition = BoundaryConditionDampedIntrinsicBeam(;
-                                                           left_velocity = exact_left_velocity,
-                                                           right_resultant = exact_right_resultant,
-                                                           right_damping_resultant = exact_right_damping_resultant)
+                                                          left_velocity = exact_left_velocity,
+                                                          right_resultant = exact_right_resultant,
+                                                          right_damping_resultant = exact_right_damping_resultant)
 boundary_conditions = (boundary_condition, boundary_condition)
 
 function verify_boundary_operators()
@@ -239,6 +190,7 @@ function verify_boundary_operators()
     orientation = 1
     for t in range(0.0, 1.0; length = 9),
         (x, direction) in ((0.0, 1), (beam_length, 2))
+
         coordinate = SVector(x)
         u = manufactured_solution(x, t)
         u_x = manufactured_solution_x(x, t)
@@ -246,9 +198,9 @@ function verify_boundary_operators()
         exact_hyperbolic_flux = flux_mms(u, u, orientation,
                                          equations_hyperbolic)
         boundary_hyperbolic_flux = boundary_condition(u, orientation,
-                                                       direction, coordinate, t,
-                                                       flux_mms,
-                                                       equations_hyperbolic)
+                                                      direction, coordinate, t,
+                                                      flux_mms,
+                                                      equations_hyperbolic)
         hyperbolic_residual = maximum(abs, boundary_hyperbolic_flux -
                                            exact_hyperbolic_flux)
         if direction == 1
@@ -262,9 +214,9 @@ function verify_boundary_operators()
                          atol = 5.0e-12, rtol = 5.0e-12)
 
         boundary_gradient_trace = boundary_condition(u, u, orientation,
-                                                      direction, coordinate, t,
-                                                      Trixi.Gradient(),
-                                                      equations_parabolic)
+                                                     direction, coordinate, t,
+                                                     Trixi.Gradient(),
+                                                     equations_parabolic)
         gradient_residual = maximum(abs, boundary_gradient_trace - u)
         if direction == 1
             maximum_left_gradient_residual = max(maximum_left_gradient_residual,
@@ -279,10 +231,10 @@ function verify_boundary_operators()
         exact_parabolic_flux = flux(u, u_x, orientation,
                                     equations_parabolic)
         boundary_parabolic_flux = boundary_condition(exact_parabolic_flux,
-                                                      nothing, orientation,
-                                                      direction, coordinate, t,
-                                                      Trixi.Divergence(),
-                                                      equations_parabolic)
+                                                     nothing, orientation,
+                                                     direction, coordinate, t,
+                                                     Trixi.Divergence(),
+                                                     equations_parabolic)
         divergence_residual = maximum(abs, boundary_parabolic_flux -
                                            exact_parabolic_flux)
         if direction == 1
@@ -358,3 +310,5 @@ sol = solve(ode, ROCK4();
             abstol = time_int_tol,
             reltol = time_int_tol,
             ode_default_options()...)
+
+require_complete_solution(sol, last(tspan))

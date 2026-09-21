@@ -1,3 +1,8 @@
+if !isdefined(@__MODULE__, :BeamRunHelpers)
+    Base.include(@__MODULE__, joinpath(@__DIR__, "beam_run_helpers.jl"))
+end
+using .BeamRunHelpers
+
 using OrdinaryDiffEqStabilizedRK
 using Trixi
 
@@ -147,3 +152,5 @@ sol = solve(ode, ROCK4();
             abstol = time_int_tol,
             reltol = time_int_tol,
             ode_default_options()...)
+
+require_complete_solution(sol, last(tspan))
